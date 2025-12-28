@@ -24,6 +24,7 @@ volatile short sendState = SEND_STATUS_NONE;
 static Ihandle *dialog, *topFrame, *bottomFrame; 
 static Ihandle *statusLabel;
 static Ihandle *filterText, *filterButton;
+static Ihandle *hotkeyLabel;
 Ihandle *filterSelectList;
 // timer to update icons
 static Ihandle *stateIcon;
@@ -51,6 +52,7 @@ static int uiFilterTextCb(Ihandle *ih);
 static void uiSetupModule(Module *module, Ihandle *parent);
 static void toggleFiltering(void);
 static void parseHotkeyConfig(const char* hotkeyStr);
+static void formatHotkeyString(char* buf, size_t bufSize);
 
 // serializing config files using a stupid custom format
 #define CONFIG_FILE "config.txt"
@@ -135,6 +137,39 @@ static void parseHotkeyConfig(const char* hotkeyStr) {
     } else {
         LOG("Invalid hotkey config '%s', using default", hotkeyStr);
     }
+}
+
+// Format hotkey as human-readable string (e.g., "Ctrl+Shift+C")
+static void formatHotkeyString(char* buf, size_t bufSize) {
+    char keyName[32] = "";
+    buf[0] = '\0';
+    
+    // Build modifier string
+    if (hotkeyModifiers & MOD_CONTROL) {
+        strcat(buf, "Ctrl+");
+    }
+    if (hotkeyModifiers & MOD_ALT) {
+        strcat(buf, "Alt+");
+    }
+    if (hotkeyModifiers & MOD_SHIFT) {
+        strcat(buf, "Shift+");
+    }
+    if (hotkeyModifiers & MOD_WIN) {
+        strcat(buf, "Win+");
+    }
+    
+    // Format key name
+    if (hotkeyVirtualKey >= VK_F1 && hotkeyVirtualKey <= VK_F12) {
+        sprintf(keyName, "F%d", hotkeyVirtualKey - VK_F1 + 1);
+    } else if (hotkeyVirtualKey >= 'A' && hotkeyVirtualKey <= 'Z') {
+        sprintf(keyName, "%c", (char)hotkeyVirtualKey);
+    } else if (hotkeyVirtualKey >= '0' && hotkeyVirtualKey <= '9') {
+        sprintf(keyName, "%c", (char)hotkeyVirtualKey);
+    } else {
+        sprintf(keyName, "0x%X", hotkeyVirtualKey);
+    }
+    
+    strncat(buf, keyName, bufSize - strlen(buf) - 1);
 }
 
 // Subclassed window procedure to handle WM_HOTKEY messages
@@ -408,7 +443,7 @@ void init(int argc, char* argv[]) {
             controlHbox = IupHbox(
                 stateIcon = IupLabel(NULL),
                 filterButton = IupButton("Start", NULL),
-                IupFill(),
+                hotkeyLabel = IupLabel(""),
                 IupLabel("Presets:  "),
                 filterSelectList = IupList(NULL),
                 NULL
@@ -451,6 +486,10 @@ void init(int argc, char* argv[]) {
     // setup state icon
     IupSetAttribute(stateIcon, "IMAGE", "none_icon");
     IupSetAttribute(stateIcon, "PADDING", "4x");
+    
+    // setup hotkey hint label (expands to fill space, text set when hotkey is registered)
+    IupSetAttribute(hotkeyLabel, "EXPAND", "HORIZONTAL");
+    IupSetAttribute(hotkeyLabel, "PADDING", "8x");
 
     // fill in options and setup callback
     IupSetAttribute(filterSelectList, "VISIBLECOLUMNS", "24");
@@ -515,7 +554,7 @@ void init(int argc, char* argv[]) {
     );
 
     IupSetAttribute(dialog, "TITLE", "clumsy " CLUMSY_VERSION);
-    IupSetAttribute(dialog, "SIZE", "480x"); // add padding manually to width
+    IupSetAttribute(dialog, "SIZE", "540x"); // add padding manually to width (extra space for hotkey label)
     IupSetAttribute(dialog, "RESIZE", "NO");
     IupSetCallback(dialog, "SHOW_CB", (Icallback)uiOnDialogShow);
 
@@ -632,8 +671,13 @@ static int uiOnDialogShow(Ihandle *ih, int state) {
     // Register global hotkey for toggle
     mainHwnd = hWnd;
     if (RegisterHotKey(hWnd, HOTKEY_ID, hotkeyModifiers, hotkeyVirtualKey)) {
+        char hotkeyStr[64];
         hotkeyRegistered = TRUE;
         LOG("Hotkey registered successfully (mods=0x%x key=0x%x)", hotkeyModifiers, hotkeyVirtualKey);
+        
+        // Update hotkey label to show the registered shortcut
+        formatHotkeyString(hotkeyStr, sizeof(hotkeyStr));
+        IupStoreAttribute(hotkeyLabel, "TITLE", hotkeyStr);
         
         // Subclass window to handle WM_HOTKEY messages
         originalWndProc = (WNDPROC)SetWindowLongPtr(hWnd, GWLP_WNDPROC, (LONG_PTR)hotkeyWndProc);

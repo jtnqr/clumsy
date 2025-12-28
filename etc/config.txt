@@ -34,5 +34,5 @@ ipv6 all: ipv6
 # Modifiers: ctrl, alt, shift (combine with +)
 # Key: a-z, 0-9, f1-f12
 # Examples: ctrl+shift+c, alt+f10, ctrl+alt+z
-# Default: ctrl+shift+c
+# Default: f6
 hotkey: f6
