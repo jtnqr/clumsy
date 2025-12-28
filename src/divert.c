@@ -218,6 +218,7 @@ static void divertConsumeStep() {
             }
             if (module->process(head, tail)) {
                 InterlockedIncrement16(&(module->processTriggered));
+                InterlockedIncrement(&(module->processCount));
             }
         } else {
             if (module->lastEnabled) {

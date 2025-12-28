@@ -135,5 +135,5 @@ Module tamperModule = {
     tamperCloseDown,
     tamperProcess,
     // runtime fields
-    0, 0, NULL
+    0, 0, NULL, 0, NULL
 };

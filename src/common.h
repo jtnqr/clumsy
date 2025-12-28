@@ -136,6 +136,8 @@ typedef struct {
     short lastEnabled; // if it is enabled on last run
     short processTriggered; // whether this module has been triggered in last step 
     Ihandle *iconHandle; // store the icon to be updated
+    volatile LONG processCount; // cumulative count of affected packets
+    Ihandle *countLabel; // label to display the count
 } Module;
 
 extern Module lagModule;

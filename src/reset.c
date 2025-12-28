@@ -128,5 +128,5 @@ Module resetModule = {
     resetCloseDown,
     resetProcess,
     // runtime fields
-    0, 0, NULL
+    0, 0, NULL, 0, NULL
 };

@@ -171,5 +171,5 @@ Module throttleModule = {
     throttleCloseDown,
     throttleProcess,
     // runtime fields
-    0, 0, NULL
+    0, 0, NULL, 0, NULL
 };

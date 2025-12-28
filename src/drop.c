@@ -87,5 +87,5 @@ Module dropModule = {
     dropCloseDown,
     dropProcess,
     // runtime fields
-    0, 0, NULL
+    0, 0, NULL, 0, NULL
 };

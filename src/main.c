@@ -745,10 +745,17 @@ static int uiOnDialogShow(Ihandle *ih, int state) {
 
 static int uiStartCb(Ihandle *ih) {
     char buf[MSG_BUFSIZE];
+    int ix;
     UNREFERENCED_PARAMETER(ih);
     if (divertStart(IupGetAttribute(filterText, "VALUE"), buf) == 0) {
         showStatus(buf);
         return IUP_DEFAULT;
+    }
+
+    // Reset packet counters for all modules
+    for (ix = 0; ix < MODULE_CNT; ++ix) {
+        InterlockedExchange(&(modules[ix]->processCount), 0);
+        IupSetAttribute(modules[ix]->countLabel, "TITLE", "");
     }
 
     // successfully started
@@ -777,7 +784,7 @@ static int uiStopCb(Ihandle *ih) {
     IupSetAttribute(filterButton, "ACTIVE", "YES");
     IupSetCallback(filterButton, "ACTION", uiStartCb);
 
-    // stop timer and clean up icons
+    // stop timer and clean up icons (keep counters visible until next start)
     IupSetAttribute(timer, "RUN", "NO");
     for (ix = 0; ix < MODULE_CNT; ++ix) {
         modules[ix]->processTriggered = 0; // use = here since is threads already stopped
@@ -825,6 +832,16 @@ static int uiTimerCb(Ihandle *ih) {
         } else {
             IupSetAttribute(modules[ix]->iconHandle, "IMAGE", "none_icon");
         }
+        
+        // Update count label with current processCount
+        {
+            char countBuf[16];
+            LONG count = modules[ix]->processCount;
+            if (count > 0) {
+                sprintf(countBuf, "%ld", count);
+                IupStoreAttribute(modules[ix]->countLabel, "TITLE", countBuf);
+            }
+        }
     }
 
     // update global send status icon
@@ -868,7 +885,7 @@ static int uiFilterTextCb(Ihandle *ih)  {
 }
 
 static void uiSetupModule(Module *module, Ihandle *parent) {
-    Ihandle *groupBox, *toggle, *controls, *icon;
+    Ihandle *groupBox, *toggle, *controls, *icon, *countLabel;
     const char *tooltip = NULL;
     
     // Tooltip descriptions for each module
@@ -893,6 +910,7 @@ static void uiSetupModule(Module *module, Ihandle *parent) {
     groupBox = IupHbox(
         icon = IupLabel(NULL),
         toggle = IupToggle(module->displayName, NULL),
+        countLabel = IupLabel(""),
         IupFill(),
         controls = module->setupUIFunc(),
         NULL
@@ -918,6 +936,11 @@ static void uiSetupModule(Module *module, Ihandle *parent) {
     IupSetAttribute(icon, "IMAGE", "none_icon");
     IupSetAttribute(icon, "PADDING", "4x");
     module->iconHandle = icon;
+    
+    // setup count label for statistics
+    IupSetAttribute(countLabel, "SIZE", "40x");
+    IupSetAttribute(countLabel, "TIP", "Packets affected by this module during current/last session. Resets when filtering starts.");
+    module->countLabel = countLabel;
 
     // parameterize toggle
     if (parameterized) {
