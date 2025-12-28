@@ -30,6 +30,16 @@ static Ihandle *stateIcon;
 static Ihandle *timer;
 static Ihandle *timeout = NULL;
 
+// Hotkey configuration
+#define HOTKEY_ID 1
+#define DEFAULT_HOTKEY_MOD (MOD_CONTROL | MOD_SHIFT)
+#define DEFAULT_HOTKEY_KEY 'C'
+static UINT hotkeyModifiers = DEFAULT_HOTKEY_MOD;
+static UINT hotkeyVirtualKey = DEFAULT_HOTKEY_KEY;
+static HWND mainHwnd = NULL;
+static BOOL hotkeyRegistered = FALSE;
+static WNDPROC originalWndProc = NULL;
+
 void showStatus(const char *line);
 static int uiOnDialogShow(Ihandle *ih, int state);
 static int uiStopCb(Ihandle *ih);
@@ -39,9 +49,12 @@ static int uiTimeoutCb(Ihandle *ih);
 static int uiListSelectCb(Ihandle *ih, char *text, int item, int state);
 static int uiFilterTextCb(Ihandle *ih);
 static void uiSetupModule(Module *module, Ihandle *parent);
+static void toggleFiltering(void);
+static void parseHotkeyConfig(const char* hotkeyStr);
 
 // serializing config files using a stupid custom format
 #define CONFIG_FILE "config.txt"
+#define STATE_FILE "state.txt"
 #define CONFIG_MAX_RECORDS 64
 #define CONFIG_BUF_SIZE 4096
 typedef struct {
@@ -52,6 +65,88 @@ UINT filtersSize;
 filterRecord filters[CONFIG_MAX_RECORDS] = {0};
 char configBuf[CONFIG_BUF_SIZE+2]; // add some padding to write \n
 BOOL parameterized = 0; // parameterized flag, means reading args from command line
+static BOOL stateLoaded = 0; // flag to indicate state was loaded (don't auto-start)
+static char hotkeyConfigStr[64] = ""; // store hotkey config string
+
+// State persistence
+static void saveState(void);
+static void loadState(void);
+
+// Parse hotkey configuration string like "ctrl+shift+c" or "alt+f10"
+static void parseHotkeyConfig(const char* hotkeyStr) {
+    char buf[64];
+    char *token, *saveptr;
+    UINT mods = 0;
+    UINT key = 0;
+    
+    if (!hotkeyStr || strlen(hotkeyStr) == 0) {
+        LOG("No hotkey config, using default");
+        return;
+    }
+    
+    strncpy(buf, hotkeyStr, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    
+    // Convert to lowercase for easier parsing
+    for (char *p = buf; *p; ++p) *p = (char)tolower(*p);
+    
+    // Parse tokens separated by +
+    token = strtok_s(buf, "+", &saveptr);
+    while (token) {
+        // Trim whitespace
+        while (*token == ' ') token++;
+        char *end = token + strlen(token) - 1;
+        while (end > token && *end == ' ') *end-- = '\0';
+        
+        // Check for modifiers
+        if (strcmp(token, "ctrl") == 0 || strcmp(token, "control") == 0) {
+            mods |= MOD_CONTROL;
+        } else if (strcmp(token, "alt") == 0) {
+            mods |= MOD_ALT;
+        } else if (strcmp(token, "shift") == 0) {
+            mods |= MOD_SHIFT;
+        } else if (strcmp(token, "win") == 0) {
+            mods |= MOD_WIN;
+        }
+        // Check for function keys F1-F12
+        else if (token[0] == 'f' && strlen(token) <= 3) {
+            int fnum = atoi(token + 1);
+            if (fnum >= 1 && fnum <= 12) {
+                key = VK_F1 + (fnum - 1);
+            }
+        }
+        // Check for single letter a-z
+        else if (strlen(token) == 1 && token[0] >= 'a' && token[0] <= 'z') {
+            key = 'A' + (token[0] - 'a'); // VK codes are uppercase
+        }
+        // Check for number 0-9
+        else if (strlen(token) == 1 && token[0] >= '0' && token[0] <= '9') {
+            key = '0' + (token[0] - '0');
+        }
+        
+        token = strtok_s(NULL, "+", &saveptr);
+    }
+    
+    // Only update if we got a valid key
+    if (key != 0) {
+        hotkeyModifiers = mods;
+        hotkeyVirtualKey = key;
+        LOG("Hotkey configured: mods=0x%x key=0x%x", mods, key);
+    } else {
+        LOG("Invalid hotkey config '%s', using default", hotkeyStr);
+    }
+}
+
+// Subclassed window procedure to handle WM_HOTKEY messages
+static LRESULT CALLBACK hotkeyWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_HOTKEY && wParam == HOTKEY_ID) {
+        LOG("Hotkey pressed, toggling filtering");
+        toggleFiltering();
+        return 0;
+    }
+    // Call original window procedure for all other messages
+    return CallWindowProc(originalWndProc, hWnd, msg, wParam, lParam);
+}
 
 // loading up filters and fill in
 void loadConfig() {
@@ -104,7 +199,14 @@ EAT_SPACE:  while (isspace(*current)) { ++current; }
             *current = '\0';
             if (*(current-1) == '\r') *(current-1) = 0;
             last = current = current + 1;
-            ++filtersSize;
+            
+            // Check if this is the hotkey config (not a filter preset)
+            if (strcmp(filters[filtersSize].filterName, "hotkey") == 0) {
+                parseHotkeyConfig(filters[filtersSize].filterValue);
+                // Don't increment filtersSize - this isn't a filter preset
+            } else {
+                ++filtersSize;
+            }
         } while (last && last - configBuf < CONFIG_BUF_SIZE);
         LOG("Loaded %u records.", filtersSize);
     }
@@ -117,6 +219,169 @@ EAT_SPACE:  while (isspace(*current)) { ++current; }
         filters[filtersSize].filterValue = "outbound and ip.DstAddr >= 127.0.0.1 and ip.DstAddr <= 127.255.255.255";
         filtersSize = 1;
     }
+}
+
+// Get path to state file (in same directory as executable)
+static void getStatePath(char* path, size_t pathSize) {
+    char *p;
+    GetModuleFileName(NULL, path, (DWORD)pathSize);
+    p = strrchr(path, '\\');
+    if (p == NULL) p = strrchr(path, '/');
+    strcpy(p + 1, STATE_FILE);
+}
+
+// Save current state to state.txt
+static void saveState(void) {
+    char path[MSG_BUFSIZE];
+    FILE *f;
+    const char *filterValue;
+    
+    getStatePath(path, sizeof(path));
+    f = fopen(path, "w");
+    if (!f) {
+        LOG("Failed to open state file for writing: %s", path);
+        return;
+    }
+    
+    LOG("Saving state to: %s", path);
+    fprintf(f, "# clumsy last state - auto-generated\n");
+    
+    // Save filter text
+    filterValue = IupGetAttribute(filterText, "VALUE");
+    if (filterValue && strlen(filterValue) > 0) {
+        fprintf(f, "filter: %s\n", filterValue);
+    }
+    
+    // Save module states
+    // We need to get values from the internal volatile variables
+    // since the UI might not have the synced values accessible easily
+    {
+        UINT ix;
+        for (ix = 0; ix < MODULE_CNT; ++ix) {
+            Module *module = modules[ix];
+            short enabled = *(module->enabledFlag);
+            fprintf(f, "%s: %s\n", module->shortName, enabled ? "on" : "off");
+        }
+    }
+    
+    // Save detailed module settings using naming convention module-setting
+    // These match the command-line parameter names used in setFromParameter
+    
+    // Lag module: lag-inbound, lag-outbound, lag-time
+    fprintf(f, "lag-inbound: %s\n", IupGetGlobal("lag-inbound") ? IupGetGlobal("lag-inbound") : "on");
+    fprintf(f, "lag-outbound: %s\n", IupGetGlobal("lag-outbound") ? IupGetGlobal("lag-outbound") : "on");
+    fprintf(f, "lag-time: %s\n", IupGetGlobal("lag-time") ? IupGetGlobal("lag-time") : "50");
+    
+    // Drop module: drop-inbound, drop-outbound, drop-chance
+    fprintf(f, "drop-inbound: %s\n", IupGetGlobal("drop-inbound") ? IupGetGlobal("drop-inbound") : "on");
+    fprintf(f, "drop-outbound: %s\n", IupGetGlobal("drop-outbound") ? IupGetGlobal("drop-outbound") : "on");
+    fprintf(f, "drop-chance: %s\n", IupGetGlobal("drop-chance") ? IupGetGlobal("drop-chance") : "10.0");
+    
+    // Throttle module
+    fprintf(f, "throttle-inbound: %s\n", IupGetGlobal("throttle-inbound") ? IupGetGlobal("throttle-inbound") : "on");
+    fprintf(f, "throttle-outbound: %s\n", IupGetGlobal("throttle-outbound") ? IupGetGlobal("throttle-outbound") : "on");
+    fprintf(f, "throttle-chance: %s\n", IupGetGlobal("throttle-chance") ? IupGetGlobal("throttle-chance") : "10.0");
+    fprintf(f, "throttle-frame: %s\n", IupGetGlobal("throttle-frame") ? IupGetGlobal("throttle-frame") : "30");
+    
+    // OOD module
+    fprintf(f, "ood-inbound: %s\n", IupGetGlobal("ood-inbound") ? IupGetGlobal("ood-inbound") : "on");
+    fprintf(f, "ood-outbound: %s\n", IupGetGlobal("ood-outbound") ? IupGetGlobal("ood-outbound") : "on");
+    fprintf(f, "ood-chance: %s\n", IupGetGlobal("ood-chance") ? IupGetGlobal("ood-chance") : "10.0");
+    
+    // Duplicate module
+    fprintf(f, "duplicate-inbound: %s\n", IupGetGlobal("duplicate-inbound") ? IupGetGlobal("duplicate-inbound") : "on");
+    fprintf(f, "duplicate-outbound: %s\n", IupGetGlobal("duplicate-outbound") ? IupGetGlobal("duplicate-outbound") : "on");
+    fprintf(f, "duplicate-chance: %s\n", IupGetGlobal("duplicate-chance") ? IupGetGlobal("duplicate-chance") : "10.0");
+    fprintf(f, "duplicate-count: %s\n", IupGetGlobal("duplicate-count") ? IupGetGlobal("duplicate-count") : "2");
+    
+    // Tamper module
+    fprintf(f, "tamper-inbound: %s\n", IupGetGlobal("tamper-inbound") ? IupGetGlobal("tamper-inbound") : "on");
+    fprintf(f, "tamper-outbound: %s\n", IupGetGlobal("tamper-outbound") ? IupGetGlobal("tamper-outbound") : "on");
+    fprintf(f, "tamper-chance: %s\n", IupGetGlobal("tamper-chance") ? IupGetGlobal("tamper-chance") : "10.0");
+    fprintf(f, "tamper-checksum: %s\n", IupGetGlobal("tamper-checksum") ? IupGetGlobal("tamper-checksum") : "on");
+    
+    // Reset module
+    fprintf(f, "reset-inbound: %s\n", IupGetGlobal("reset-inbound") ? IupGetGlobal("reset-inbound") : "on");
+    fprintf(f, "reset-outbound: %s\n", IupGetGlobal("reset-outbound") ? IupGetGlobal("reset-outbound") : "on");
+    fprintf(f, "reset-chance: %s\n", IupGetGlobal("reset-chance") ? IupGetGlobal("reset-chance") : "0");
+    
+    // Bandwidth module
+    fprintf(f, "bandwidth-inbound: %s\n", IupGetGlobal("bandwidth-inbound") ? IupGetGlobal("bandwidth-inbound") : "on");
+    fprintf(f, "bandwidth-outbound: %s\n", IupGetGlobal("bandwidth-outbound") ? IupGetGlobal("bandwidth-outbound") : "on");
+    fprintf(f, "bandwidth-bandwidth: %s\n", IupGetGlobal("bandwidth-bandwidth") ? IupGetGlobal("bandwidth-bandwidth") : "10");
+    
+    fclose(f);
+    LOG("State saved successfully");
+}
+
+// State buffer for loading (separate from config buffer)
+static char stateBuf[CONFIG_BUF_SIZE + 2];
+
+// Load state from state.txt (sets IupGlobal values that get applied during UI setup)
+static void loadState(void) {
+    char path[MSG_BUFSIZE];
+    FILE *f;
+    
+    getStatePath(path, sizeof(path));
+    f = fopen(path, "r");
+    if (!f) {
+        LOG("No state file found: %s", path);
+        return;
+    }
+    
+    LOG("Loading state from: %s", path);
+    
+    {
+        size_t len;
+        char *current, *last;
+        len = fread(stateBuf, sizeof(char), CONFIG_BUF_SIZE, f);
+        stateBuf[len] = '\n';
+        stateBuf[len + 1] = '\0';
+        fclose(f);
+        
+        // Parse key: value pairs
+        last = current = stateBuf;
+        do {
+            char *key, *value;
+            
+            // Skip whitespace and comments
+            while (isspace(*current)) { ++current; }
+            if (*current == '#') {
+                current = strchr(current, '\n');
+                if (!current) break;
+                current++;
+                continue;
+            }
+            if (*current == '\0') break;
+            
+            // Parse key
+            key = current;
+            current = strchr(current, ':');
+            if (!current) break;
+            *current = '\0';
+            current++;
+            
+            // Skip space after :
+            while (*current == ' ') current++;
+            
+            // Parse value
+            value = current;
+            current = strchr(current, '\n');
+            if (current) {
+                *current = '\0';
+                if (*(current - 1) == '\r') *(current - 1) = '\0';
+                current++;
+            }
+            
+            // Store in IupGlobal for setFromParameter to use
+            LOG("State: %s = %s", key, value);
+            IupStoreGlobal(key, value);
+            
+            last = current;
+        } while (current && current - stateBuf < CONFIG_BUF_SIZE);
+    }
+    
+    LOG("State loaded");
 }
 
 void init(int argc, char* argv[]) {
@@ -162,6 +427,15 @@ void init(int argc, char* argv[]) {
             exit(-1); // fail fast.
         }
         parameterized = 1;
+    } else {
+        // No command-line args, try to load last saved state
+        loadState();
+        // Check if filter was loaded from state
+        if (IupGetGlobal("filter") != NULL) {
+            parameterized = 1;  // Enable parameter loading for modules
+            stateLoaded = 1;    // Mark as state-loaded (don't auto-start)
+            LOG("State loaded, enabling parameterized mode (no auto-start)");
+        }
     }
 
     IupSetAttribute(topFrame, "TITLE", "Filtering");
@@ -190,6 +464,16 @@ void init(int argc, char* argv[]) {
     IupSetCallback(filterSelectList, "ACTION", (Icallback)uiListSelectCb);
     // set filter text value since the callback won't take effect before main loop starts
     IupSetAttribute(filterText, "VALUE", filters[0].filterValue);
+    
+    // If state was loaded, restore the saved filter text and deselect preset
+    if (stateLoaded) {
+        const char *savedFilter = IupGetGlobal("filter");
+        LOG("Restoring filter from state: %s", savedFilter ? savedFilter : "(null)");
+        if (savedFilter && strlen(savedFilter) > 0) {
+            IupStoreAttribute(filterText, "VALUE", savedFilter);
+            IupSetAttribute(filterSelectList, "VALUE", "0");  // Deselect preset
+        }
+    }
 
     // functionalities frame 
     bottomFrame = IupFrame(
@@ -271,6 +555,20 @@ void startup() {
 }
 
 void cleanup() {
+    // Save current state before exiting
+    saveState();
+    
+    // Unregister hotkey and restore window procedure
+    if (hotkeyRegistered && mainHwnd) {
+        // Restore original window procedure first
+        if (originalWndProc) {
+            SetWindowLongPtr(mainHwnd, GWLP_WNDPROC, (LONG_PTR)originalWndProc);
+            originalWndProc = NULL;
+        }
+        UnregisterHotKey(mainHwnd, HOTKEY_ID);
+        hotkeyRegistered = FALSE;
+        LOG("Hotkey unregistered");
+    }
 
     IupDestroy(timer);
     if (timeout) {
@@ -331,6 +629,21 @@ static int uiOnDialogShow(Ihandle *ih, int state) {
     SendMessage(hWnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
     SendMessage(hWnd, WM_SETICON, ICON_SMALL, (LPARAM)icon);
 
+    // Register global hotkey for toggle
+    mainHwnd = hWnd;
+    if (RegisterHotKey(hWnd, HOTKEY_ID, hotkeyModifiers, hotkeyVirtualKey)) {
+        hotkeyRegistered = TRUE;
+        LOG("Hotkey registered successfully (mods=0x%x key=0x%x)", hotkeyModifiers, hotkeyVirtualKey);
+        
+        // Subclass window to handle WM_HOTKEY messages
+        originalWndProc = (WNDPROC)SetWindowLongPtr(hWnd, GWLP_WNDPROC, (LONG_PTR)hotkeyWndProc);
+        if (originalWndProc) {
+            LOG("Window subclassed for hotkey handling");
+        }
+    } else {
+        LOG("Failed to register hotkey (error=%lu)", GetLastError());
+    }
+
     exit = checkIsRunning();
     if (exit) {
         MessageBox(hWnd, (LPCSTR)"Theres' already an instance of clumsy running.",
@@ -346,12 +659,18 @@ static int uiOnDialogShow(Ihandle *ih, int state) {
 #endif
 
     // try elevate and decides whether to exit
-    exit = tryElevate(hWnd, parameterized);
+    // Only be silent if this is actual command-line parameterized mode, not state restore
+    exit = tryElevate(hWnd, parameterized && !stateLoaded);
 
     if (!exit && parameterized) {
         setFromParameter(filterText, "VALUE", "filter");
-        LOG("is parameterized, start filtering upon execution.");
-        uiStartCb(filterButton);
+        // Only auto-start if this is command-line parameterized, NOT state restore
+        if (!stateLoaded) {
+            LOG("is parameterized, start filtering upon execution.");
+            uiStartCb(filterButton);
+        } else {
+            LOG("State restored, NOT auto-starting (safety)");
+        }
     }
 
     return exit ? IUP_CLOSE : IUP_DEFAULT;
@@ -400,6 +719,16 @@ static int uiStopCb(Ihandle *ih) {
 
     showStatus("Stopped. To begin again, edit criteria and click Start.");
     return IUP_DEFAULT;
+}
+
+// Toggle filtering on/off (called by hotkey)
+static void toggleFiltering(void) {
+    const char* title = IupGetAttribute(filterButton, "TITLE");
+    if (strcmp(title, "Start") == 0) {
+        uiStartCb(filterButton);
+    } else {
+        uiStopCb(filterButton);
+    }
 }
 
 static int uiToggleControls(Ihandle *ih, int state) {

@@ -3,6 +3,9 @@
 #include "iup.h"
 #include "common.h"
 
+// Custom attribute to store parameter key for state saving
+#define PARAM_KEY "__PARAM_KEY"
+
 short calcChance(short chance) {
     // notice that here we made a copy of chance, so even though it's volatile it is still ok
     return (chance == 10000) || ((rand() % 10000) < chance);
@@ -31,6 +34,7 @@ int uiSyncChance(Ihandle *ih) {
     char valueBuf[8];
     float value = IupGetFloat(ih, "VALUE"), newValue = value;
     short *chancePtr = (short*)IupGetAttribute(ih, SYNCED_VALUE);
+    char *paramKey = IupGetAttribute(ih, PARAM_KEY);
     if (newValue > 100.0f) {
        newValue = 100.0f;
     } else if (newValue < 0) {
@@ -44,6 +48,11 @@ int uiSyncChance(Ihandle *ih) {
     }
     // and sync chance value
     InterlockedExchange16(chancePtr, (short)(newValue * 100));
+    // Also update IupGlobal for state saving
+    if (paramKey) {
+        sprintf(valueBuf, "%.1f", newValue);
+        IupStoreGlobal(paramKey, valueBuf);
+    }
     return IUP_DEFAULT;
 }
 
@@ -52,6 +61,7 @@ int uiSyncInt32(Ihandle *ih) {
     LONG *integerPointer = (LONG*)IupGetAttribute(ih, SYNCED_VALUE);
     const int maxValue = IupGetInt(ih, INTEGER_MAX);
     const int minValue = IupGetInt(ih, INTEGER_MIN);
+    char *paramKey = IupGetAttribute(ih, PARAM_KEY);
     // normalize input into [min, max]
     int value = IupGetInt(ih, "VALUE"), newValue = value;
     char valueBuf[8];
@@ -69,12 +79,22 @@ int uiSyncInt32(Ihandle *ih) {
     }
     // sync back
     InterlockedExchange(integerPointer, newValue);
+    // Also update IupGlobal for state saving
+    if (paramKey) {
+        sprintf(valueBuf, "%d", newValue);
+        IupStoreGlobal(paramKey, valueBuf);
+    }
     return IUP_DEFAULT;
 }
 
 int uiSyncToggle(Ihandle *ih, int state) {
     short *togglePtr = (short*)IupGetAttribute(ih, SYNCED_VALUE);
+    char *paramKey = IupGetAttribute(ih, PARAM_KEY);
     InterlockedExchange16(togglePtr, I2S(state));
+    // Also update IupGlobal for state saving
+    if (paramKey) {
+        IupStoreGlobal(paramKey, state ? "on" : "off");
+    }
     return IUP_DEFAULT;
 }
 
@@ -82,6 +102,7 @@ int uiSyncInteger(Ihandle *ih) {
     short *integerPointer = (short*)IupGetAttribute(ih, SYNCED_VALUE);
     const int maxValue = IupGetInt(ih, INTEGER_MAX);
     const int minValue = IupGetInt(ih, INTEGER_MIN);
+    char *paramKey = IupGetAttribute(ih, PARAM_KEY);
     // normalize input into [min, max]
     int value = IupGetInt(ih, "VALUE"), newValue = value;
     char valueBuf[8];
@@ -99,6 +120,11 @@ int uiSyncInteger(Ihandle *ih) {
     }
     // sync back
     InterlockedExchange16(integerPointer, (short)newValue);
+    // Also update IupGlobal for state saving
+    if (paramKey) {
+        sprintf(valueBuf, "%d", newValue);
+        IupStoreGlobal(paramKey, valueBuf);
+    }
     return IUP_DEFAULT;
 }
 
@@ -148,6 +174,10 @@ void setFromParameter(Ihandle *ih, const char *field, const char *key) {
     char* val = IupGetGlobal(key);
     Icallback cb;
     IstateCallback scb;
+    
+    // Store the key on the control so callbacks can update IupGlobal
+    IupSetAttribute(ih, PARAM_KEY, (char*)key);
+    
     // FIXME there should be a way to trigger handler
     // manually trigger the callback, as iup won't call it
     // Notice that currently only works on IupToggle, IupText

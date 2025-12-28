@@ -25,3 +25,14 @@ ipv6 all: ipv6
 
 # you can add your usual filters here for your own use:
 #http requests ONLY(data transmit on other ports): outbound and tcp.DstPort == 80
+
+# ============================================================================
+# Hotkey Configuration
+# ============================================================================
+# Global hotkey to toggle start/stop filtering
+# Format: hotkey: modifiers+key
+# Modifiers: ctrl, alt, shift (combine with +)
+# Key: a-z, 0-9, f1-f12
+# Examples: ctrl+shift+c, alt+f10, ctrl+alt+z
+# Default: ctrl+shift+c
+hotkey: f6
