@@ -44,6 +44,12 @@ static Ihandle* dupSetupUI() {
     // enable by default to avoid confusing
     IupSetAttribute(inboundCheckbox, "VALUE", "ON");
     IupSetAttribute(outboundCheckbox, "VALUE", "ON");
+    
+    // Set tooltips for controls
+    IupSetAttribute(countInput, "TIP", "Number of packet copies to create (2-50)");
+    IupSetAttribute(inboundCheckbox, "TIP", "Apply to incoming packets");
+    IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
+    IupSetAttribute(chanceInput, "TIP", "Probability of duplicating (0-100%)");
 
     if (parameterized) {
         setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");

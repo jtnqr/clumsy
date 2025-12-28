@@ -38,6 +38,12 @@ static Ihandle* tamperSetupUI() {
     IupSetAttribute(inboundCheckbox, "VALUE", "ON");
     IupSetAttribute(outboundCheckbox, "VALUE", "ON");
     IupSetAttribute(checksumCheckbox, "VALUE", "ON");
+    
+    // Set tooltips for controls
+    IupSetAttribute(checksumCheckbox, "TIP", "Recalculate packet checksum after modification");
+    IupSetAttribute(inboundCheckbox, "TIP", "Apply to incoming packets");
+    IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
+    IupSetAttribute(chanceInput, "TIP", "Probability of tampering (0-100%)");
 
     if (parameterized) {
         setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");

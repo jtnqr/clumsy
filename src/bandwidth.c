@@ -75,6 +75,11 @@ static Ihandle* bandwidthSetupUI() {
     // enable by default to avoid confusing
     IupSetAttribute(inboundCheckbox, "VALUE", "ON");
     IupSetAttribute(outboundCheckbox, "VALUE", "ON");
+    
+    // Set tooltips for controls
+    IupSetAttribute(inboundCheckbox, "TIP", "Apply to incoming packets");
+    IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
+    IupSetAttribute(bandwidthInput, "TIP", "Maximum bandwidth in kilobytes per second");
 
     if (parameterized) {
         setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
@@ -294,6 +299,3 @@ int32_t crate_stats_calculate(CRateStats *rate, uint32_t now_ts)
 
 	return (int32_t)r;
 }
-
-
-

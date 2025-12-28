@@ -50,6 +50,12 @@ static Ihandle* resetSetupUI() {
     // enable by default to avoid confusing
     IupSetAttribute(inboundCheckbox, "VALUE", "ON");
     IupSetAttribute(outboundCheckbox, "VALUE", "ON");
+    
+    // Set tooltips for controls
+    IupSetAttribute(rstButton, "TIP", "Manually send RST for the next TCP packet");
+    IupSetAttribute(inboundCheckbox, "TIP", "Apply to incoming packets");
+    IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
+    IupSetAttribute(chanceInput, "TIP", "Probability of sending RST (0-100%)");
 
     if (parameterized) {
         setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");

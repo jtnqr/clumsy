@@ -50,6 +50,11 @@ static Ihandle *lagSetupUI() {
     // enable by default to avoid confusing
     IupSetAttribute(inboundCheckbox, "VALUE", "ON");
     IupSetAttribute(outboundCheckbox, "VALUE", "ON");
+    
+    // Set tooltips for controls
+    IupSetAttribute(inboundCheckbox, "TIP", "Apply to incoming packets");
+    IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
+    IupSetAttribute(timeInput, "TIP", "Delay time in milliseconds (0-15000)");
 
     if (parameterized) {
         setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");

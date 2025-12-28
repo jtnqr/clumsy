@@ -477,8 +477,24 @@ void init(int argc, char* argv[]) {
     IupSetAttribute(topFrame, "EXPAND", "HORIZONTAL");
     IupSetAttribute(filterText, "EXPAND", "HORIZONTAL");
     IupSetCallback(filterText, "VALUECHANGED_CB", (Icallback)uiFilterTextCb);
+    IupSetAttribute(filterText, "TIP", 
+        "WinDivert filter expression\n"
+        "\n"
+        "Direction: inbound, outbound\n"
+        "Protocol: tcp, udp, icmp\n"
+        "IP: ip.SrcAddr, ip.DstAddr\n"
+        "Ports: tcp.SrcPort, tcp.DstPort, udp.SrcPort, udp.DstPort\n"
+        "Operators: ==, !=, <, >, <=, >=, and, or, not\n"
+        "\n"
+        "Examples:\n"
+        "  outbound and tcp.DstPort == 80\n"
+        "  udp and ip.DstAddr == 192.168.1.1\n"
+        "  tcp.SrcPort == 443 or tcp.DstPort == 443\n"
+        "\n"
+        "Note: For localhost packets, use 'outbound' only");
     IupSetAttribute(filterButton, "PADDING", "8x");
     IupSetCallback(filterButton, "ACTION", uiStartCb);
+    IupSetAttribute(filterButton, "TIP", "Start/Stop packet filtering");
     IupSetAttribute(topVbox, "NCMARGIN", "4x4");
     IupSetAttribute(topVbox, "NCGAP", "4x2");
     IupSetAttribute(controlHbox, "ALIGNMENT", "ACENTER");
@@ -679,6 +695,13 @@ static int uiOnDialogShow(Ihandle *ih, int state) {
         formatHotkeyString(hotkeyStr, sizeof(hotkeyStr));
         IupStoreAttribute(hotkeyLabel, "TITLE", hotkeyStr);
         
+        // Update button tooltip to include the hotkey
+        {
+            char tipStr[128];
+            sprintf(tipStr, "Start/Stop packet filtering (Hotkey: %s)", hotkeyStr);
+            IupStoreAttribute(filterButton, "TIP", tipStr);
+        }
+        
         // Subclass window to handle WM_HOTKEY messages
         originalWndProc = (WNDPROC)SetWindowLongPtr(hWnd, GWLP_WNDPROC, (LONG_PTR)hotkeyWndProc);
         if (originalWndProc) {
@@ -730,6 +753,7 @@ static int uiStartCb(Ihandle *ih) {
 
     // successfully started
     showStatus("Started filtering. Enable functionalities to take effect.");
+    IupSetAttribute(dialog, "TITLE", "clumsy " CLUMSY_VERSION " (running)");
     IupSetAttribute(filterText, "ACTIVE", "NO");
     IupSetAttribute(filterButton, "TITLE", "Stop");
     IupSetCallback(filterButton, "ACTION", uiStopCb);
@@ -747,6 +771,7 @@ static int uiStopCb(Ihandle *ih) {
     IupFlush(); // flush to show disabled state
     divertStop();
 
+    IupSetAttribute(dialog, "TITLE", "clumsy " CLUMSY_VERSION);
     IupSetAttribute(filterText, "ACTIVE", "YES");
     IupSetAttribute(filterButton, "TITLE", "Start");
     IupSetAttribute(filterButton, "ACTIVE", "YES");
@@ -844,6 +869,27 @@ static int uiFilterTextCb(Ihandle *ih)  {
 
 static void uiSetupModule(Module *module, Ihandle *parent) {
     Ihandle *groupBox, *toggle, *controls, *icon;
+    const char *tooltip = NULL;
+    
+    // Tooltip descriptions for each module
+    if (strcmp(module->shortName, "lag") == 0) {
+        tooltip = "Delay packets by a specified time (ms)";
+    } else if (strcmp(module->shortName, "drop") == 0) {
+        tooltip = "Randomly drop packets based on chance";
+    } else if (strcmp(module->shortName, "throttle") == 0) {
+        tooltip = "Block packets for a time frame, then release all at once";
+    } else if (strcmp(module->shortName, "duplicate") == 0) {
+        tooltip = "Duplicate packets a specified number of times";
+    } else if (strcmp(module->shortName, "ood") == 0) {
+        tooltip = "Reorder packets to simulate out-of-order delivery";
+    } else if (strcmp(module->shortName, "tamper") == 0) {
+        tooltip = "Randomly modify packet payload bytes";
+    } else if (strcmp(module->shortName, "reset") == 0) {
+        tooltip = "Send TCP RST to reset connections";
+    } else if (strcmp(module->shortName, "bandwidth") == 0) {
+        tooltip = "Limit bandwidth to specified KB/s";
+    }
+    
     groupBox = IupHbox(
         icon = IupLabel(NULL),
         toggle = IupToggle(module->displayName, NULL),
@@ -862,6 +908,11 @@ static void uiSetupModule(Module *module, Ihandle *parent) {
     IupSetAttribute(toggle, SYNCED_VALUE, (char*)module->enabledFlag);
     IupSetAttribute(controls, "ACTIVE", "NO"); // startup as inactive
     IupSetAttribute(controls, "NCGAP", "4"); // startup as inactive
+    
+    // Set tooltip on toggle
+    if (tooltip) {
+        IupSetAttribute(toggle, "TIP", tooltip);
+    }
 
     // set default icon
     IupSetAttribute(icon, "IMAGE", "none_icon");
