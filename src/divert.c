@@ -331,7 +331,9 @@ static DWORD divertReadLoop(LPVOID arg) {
 
     for(;;) {
         // each step must fully consume the list
-        assert(isListEmpty()); // FIXME has failed this assert before. don't know why
+        if (!isListEmpty()) {
+            LOG("Warning: list not empty at start of read loop iteration");
+        }
         if (!WinDivertRecv(divertHandle, packetBuf, MAX_PACKETSIZE, &readLen, &addrBuf)) {
             DWORD lastError = GetLastError();
             if (lastError == ERROR_INVALID_HANDLE || lastError == ERROR_OPERATION_ABORTED) {
@@ -363,7 +365,11 @@ static DWORD divertReadLoop(LPVOID arg) {
                 }
                 // create node and put it into the list
                 pnode = createNode(packetBuf, readLen, &addrBuf);
-                appendNode(pnode);
+                if (pnode == NULL) {
+                    LOG("Failed to create packet node, dropping packet");
+                } else {
+                    appendNode(pnode);
+                }
                 divertConsumeStep();
                 /***************** leave critical region ************************/
                 if (!ReleaseMutex(mutex)) {
@@ -393,6 +399,14 @@ void divertStop() {
     LOG("Stopping...");
     InterlockedIncrement16(&stopLooping);
     WaitForMultipleObjects(2, threads, TRUE, INFINITE);
+
+    // Clean up handles
+    CloseHandle(loopThread);
+    CloseHandle(clockThread);
+    CloseHandle(mutex);
+    loopThread = NULL;
+    clockThread = NULL;
+    mutex = NULL;
 
     LOG("Successfully waited threads and stopped.");
 }

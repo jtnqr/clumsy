@@ -142,34 +142,35 @@ static void parseHotkeyConfig(const char* hotkeyStr) {
 // Format hotkey as human-readable string (e.g., "Ctrl+Shift+C")
 static void formatHotkeyString(char* buf, size_t bufSize) {
     char keyName[32] = "";
+    size_t pos = 0;
     buf[0] = '\0';
     
     // Build modifier string
     if (hotkeyModifiers & MOD_CONTROL) {
-        strcat(buf, "Ctrl+");
+        pos += snprintf(buf + pos, bufSize - pos, "Ctrl+");
     }
     if (hotkeyModifiers & MOD_ALT) {
-        strcat(buf, "Alt+");
+        pos += snprintf(buf + pos, bufSize - pos, "Alt+");
     }
     if (hotkeyModifiers & MOD_SHIFT) {
-        strcat(buf, "Shift+");
+        pos += snprintf(buf + pos, bufSize - pos, "Shift+");
     }
     if (hotkeyModifiers & MOD_WIN) {
-        strcat(buf, "Win+");
+        pos += snprintf(buf + pos, bufSize - pos, "Win+");
     }
     
     // Format key name
     if (hotkeyVirtualKey >= VK_F1 && hotkeyVirtualKey <= VK_F12) {
-        sprintf(keyName, "F%d", hotkeyVirtualKey - VK_F1 + 1);
+        snprintf(keyName, sizeof(keyName), "F%d", hotkeyVirtualKey - VK_F1 + 1);
     } else if (hotkeyVirtualKey >= 'A' && hotkeyVirtualKey <= 'Z') {
-        sprintf(keyName, "%c", (char)hotkeyVirtualKey);
+        snprintf(keyName, sizeof(keyName), "%c", (char)hotkeyVirtualKey);
     } else if (hotkeyVirtualKey >= '0' && hotkeyVirtualKey <= '9') {
-        sprintf(keyName, "%c", (char)hotkeyVirtualKey);
+        snprintf(keyName, sizeof(keyName), "%c", (char)hotkeyVirtualKey);
     } else {
-        sprintf(keyName, "0x%X", hotkeyVirtualKey);
+        snprintf(keyName, sizeof(keyName), "0x%X", hotkeyVirtualKey);
     }
     
-    strncat(buf, keyName, bufSize - strlen(buf) - 1);
+    snprintf(buf + pos, bufSize - pos, "%s", keyName);
 }
 
 // Subclassed window procedure to handle WM_HOTKEY messages
@@ -192,7 +193,11 @@ void loadConfig() {
     LOG("Executable path: %s", path);
     p = strrchr(path, '\\');
     if (p == NULL) p = strrchr(path, '/'); // holy shit
-    strcpy(p+1, CONFIG_FILE);
+    if (p == NULL || (size_t)(p - path + 1 + strlen(CONFIG_FILE)) >= MSG_BUFSIZE) {
+        LOG("Path too long for config file");
+        return;
+    }
+    snprintf(p + 1, MSG_BUFSIZE - (p - path + 1), "%s", CONFIG_FILE);
     LOG("Config path: %s", path);
     f = fopen(path, "r");
     if (f) {

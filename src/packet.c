@@ -18,7 +18,16 @@ void initPacketNodeList() {
 //       just not sure I can write a better memory allocator
 PacketNode* createNode(char* buf, UINT len, WINDIVERT_ADDRESS *addr) {
     PacketNode *newNode = (PacketNode*)malloc(sizeof(PacketNode));
+    if (newNode == NULL) {
+        LOG("Failed to allocate PacketNode");
+        return NULL;
+    }
     newNode->packet = (char*)malloc(len);
+    if (newNode->packet == NULL) {
+        LOG("Failed to allocate packet buffer");
+        free(newNode);
+        return NULL;
+    }
     memcpy(newNode->packet, buf, len);
     newNode->packetLen = len;
     memcpy(&(newNode->addr), addr, sizeof(WINDIVERT_ADDRESS));
