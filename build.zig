@@ -51,6 +51,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         exe.subsystem = subsystem;
+        exe.root_module.strip = (optimize_mode != .Debug);
         const m = exe.root_module;
 
         // Add C source files
