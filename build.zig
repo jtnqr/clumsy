@@ -102,7 +102,14 @@ pub fn build(b: *std.Build) void {
         m.linkSystemLibrary("iphlpapi", .{});
 
         // Windows resource file compilation (clumsy.rc)
-        m.addWin32ResourceFile(.{ .file = b.path("etc/clumsy.rc") });
+        const rc_flags = if (std.mem.eql(u8, t.name, "x64"))
+            &[_][]const u8{"-DX64"}
+        else
+            &[_][]const u8{"-DX32"};
+        m.addWin32ResourceFile(.{
+            .file = b.path("etc/clumsy.rc"),
+            .flags = rc_flags,
+        });
 
         // Setup install step
         const install_exe = b.addInstallArtifact(exe, .{});
