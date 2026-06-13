@@ -2,9 +2,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <Windows.h>
 #include "iup.h"
 #include "common.h"
+#include "process_filter.h"
+#include "ui_components.h"
 
 // ! the order decides which module get processed first
 Module* modules[MODULE_CNT] = {
@@ -350,6 +354,14 @@ static void saveState(void) {
     fprintf(f, "bandwidth-outbound: %s\n", IupGetGlobal("bandwidth-outbound") ? IupGetGlobal("bandwidth-outbound") : "on");
     fprintf(f, "bandwidth-bandwidth: %s\n", IupGetGlobal("bandwidth-bandwidth") ? IupGetGlobal("bandwidth-bandwidth") : "10");
     
+    // Save process filter state
+    {
+        const char *procVal = uiGetProcessFilterTarget();
+        fprintf(f, "process-filter-target: %s\n", procVal ? procVal : "roblox");
+        short procEnabled = uiIsProcessFilterEnabled();
+        fprintf(f, "process-filter-enabled: %s\n", procEnabled ? "on" : "off");
+    }
+
     fclose(f);
     LOG("State saved successfully");
 }
@@ -564,10 +576,14 @@ void init(int argc, char* argv[]) {
         uiSetupModule(*(modules+ix), bottomVbox);
     }
 
+    // Process filter frame setup using the ui_components abstraction module
+    Ihandle *processFilterFrame = uiCreateProcessFilterFrame();
+
     // dialog
     dialog = IupDialog(
         dialogVBox = IupVbox(
             topFrame,
+            processFilterFrame,
             bottomFrame,
             statusLabel,
             NULL
@@ -602,6 +618,9 @@ void init(int argc, char* argv[]) {
         IupSetCallback(timeout, "ACTION_CB", uiTimeoutCb);
         IupSetAttribute(timeout, "RUN", "YES");
     }
+
+    // Initialize the process filter module
+    processFilterInit();
 }
 
 void startup() {
@@ -629,6 +648,9 @@ void cleanup() {
         hotkeyRegistered = FALSE;
         LOG("Hotkey unregistered");
     }
+
+    // Clean up the process filter module
+    processFilterCleanup();
 
     IupDestroy(timer);
     if (timeout) {
@@ -751,11 +773,40 @@ static int uiOnDialogShow(Ihandle *ih, int state) {
 static int uiStartCb(Ihandle *ih) {
     char buf[MSG_BUFSIZE];
     int ix;
+    const char *filterExpr;
     UNREFERENCED_PARAMETER(ih);
-    if (divertStart(IupGetAttribute(filterText, "VALUE"), buf) == 0) {
+
+    const char *manualFilter = IupGetAttribute(filterText, "VALUE");
+    static char combinedFilter[4096];
+
+    if (uiIsProcessFilterEnabled()) {
+        const char *procTarget = uiGetProcessFilterTarget();
+        // Trigger process filter lookup
+        if (processFilterTrigger(procTarget)) {
+            const char *procExpr = processFilterGetExpression();
+            if (manualFilter && strlen(manualFilter) > 0) {
+                snprintf(combinedFilter, sizeof(combinedFilter), "(%s) && (%s)", manualFilter, procExpr);
+            } else {
+                snprintf(combinedFilter, sizeof(combinedFilter), "%s", procExpr);
+            }
+            filterExpr = combinedFilter;
+            LOG("Process filter combined; final filter: %s", filterExpr);
+        } else {
+            IupMessage("Error", "Process filter lookup timed out or failed to discover active ports!");
+            showStatus("Process filter lookup timed out!");
+            return IUP_DEFAULT;
+        }
+    } else {
+        filterExpr = manualFilter;
+    }
+
+    if (divertStart(filterExpr, buf) == 0) {
         showStatus(buf);
         return IUP_DEFAULT;
     }
+
+    // Disable process filter inputs during active filtering
+    uiSetProcessFilterActive(FALSE);
 
     // Reset packet counters for all modules
     for (ix = 0; ix < MODULE_CNT; ++ix) {
@@ -785,6 +836,7 @@ static int uiStopCb(Ihandle *ih) {
 
     IupSetAttribute(dialog, "TITLE", "clumsy " CLUMSY_VERSION);
     IupSetAttribute(filterText, "ACTIVE", "YES");
+    uiSetProcessFilterActive(TRUE);
     IupSetAttribute(filterButton, "TITLE", "Start");
     IupSetAttribute(filterButton, "ACTIVE", "YES");
     IupSetCallback(filterButton, "ACTION", uiStartCb);
@@ -953,7 +1005,35 @@ static void uiSetupModule(Module *module, Ihandle *parent) {
     }
 }
 
+#ifndef _MSC_VER
+#undef __argc
+#undef __argv
+int __argc = 0;
+char **__argv = NULL;
+#ifdef _WIN64
+int *__imp___argc = &__argc;
+char ***__imp___argv = &__argv;
+#else
+int *_imp____argc = &__argc;
+char ***_imp____argv = &__argv;
+#endif
+
+#ifdef _WIN64
+__declspec(dllexport) int _setjmp(void *env, void *ctx) {
+    return __builtin_setjmp(env);
+}
+#endif
+#endif
+
+
+
+
+
 int main(int argc, char* argv[]) {
+#ifndef _MSC_VER
+    __argc = argc;
+    __argv = argv;
+#endif
     LOG("Is Run As Admin: %d", IsRunAsAdmin());
     LOG("Is Elevated: %d", IsElevated());
     init(argc, argv);
@@ -961,3 +1041,6 @@ int main(int argc, char* argv[]) {
     cleanup();
     return 0;
 }
+
+
+
