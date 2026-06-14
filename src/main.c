@@ -258,6 +258,89 @@ static LRESULT CALLBACK hotkeyWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
     return CallWindowProc(originalWndProc, hWnd, msg, wParam, lParam);
 }
 
+static const char *default_yaml_template =
+    "# ============================================================================\n"
+    "# CLUMSY VERSION " CLUMSY_VERSION " GLOBAL CONFIGURATION\n"
+    "# ============================================================================\n"
+    "# This file dictates the core operational profiles and presets for packet manipulation.\n"
+    "# Each profile fully controls the filtering rules, target processes, execution timers,\n"
+    "# and individual functional interception modules simultaneously.\n"
+    "#\n"
+    "# WinDivert Filter Reference:\n"
+    "# See https://github.com/basil00/Divert/wiki/WinDivert-Documentation#7-filter-language\n"
+    "# ----------------------------------------------------------------------------\n"
+    "\n"
+    "# Global Interception Triggers\n"
+    "hotkey: \"f6\"\n"
+    "\n"
+    "profiles:\n"
+    "  # --------------------------------------------------------------------------\n"
+    "  # High-Performance Specialized Presets\n"
+    "  # --------------------------------------------------------------------------\n"
+    "  - name: \"roblox inbound\"\n"
+    "    filter: \"inbound\"\n"
+    "    process_filter:\n"
+    "      enabled: true\n"
+    "      target: \"roblox\"\n"
+    "      duration:\n"
+    "        enabled: false\n"
+    "        value_ms: 10\n"
+    "      modules:\n"
+    "        drop:\n"
+    "          enabled: true\n"
+    "          inbound: true\n"
+    "          outbound: false\n"
+    "          chance: 100.0\n"
+    "        bandwidth:\n"
+    "          enabled: true\n"
+    "          inbound: true\n"
+    "          outbound: false\n"
+    "          limit: 1\n"
+    "        lag:\n"
+    "          enabled: false\n"
+    "\n"
+    "  # --------------------------------------------------------------------------\n"
+    "  # Standard Network Pipeline Filters\n"
+    "  # --------------------------------------------------------------------------\n"
+    "  - name: \"localhost ipv4 all\"\n"
+    "    filter: \"outbound and loopback\"\n"
+    "\n"
+    "  - name: \"localhost ipv4 tcp\"\n"
+    "    filter: \"tcp and outbound and loopback\"\n"
+    "\n"
+    "  - name: \"localhost ipv4 udp\"\n"
+    "    filter: \"udp and outbound and loopback\"\n"
+    "\n"
+    "  - name: \"all sending packets\"\n"
+    "    filter: \"outbound\"\n"
+    "\n"
+    "  - name: \"all receiving packets\"\n"
+    "    filter: \"inbound\"\n"
+    "\n"
+    "  # --------------------------------------------------------------------------\n"
+    "  # IP & Port Targeted Network Diagnostics\n"
+    "  # --------------------------------------------------------------------------\n"
+    "  - name: \"all ipv4 against specific ip\"\n"
+    "    filter: \"ip.DstAddr == 198.51.100.1 or ip.SrcAddr == 198.51.100.1\"\n"
+    "\n"
+    "  - name: \"tcp ipv4 against specific ip\"\n"
+    "    filter: \"tcp and (ip.DstAddr == 198.51.100.1 or ip.SrcAddr == 198.51.100.1)\"\n"
+    "\n"
+    "  - name: \"udp ipv4 against specific ip\"\n"
+    "    filter: \"udp and (ip.DstAddr == 198.51.100.1 or ip.SrcAddr == 198.51.100.1)\"\n"
+    "\n"
+    "  - name: \"all ipv4 against port\"\n"
+    "    filter: \"tcp.DstPort == 12354 or tcp.SrcPort == 12354 or udp.DstPort == 12354 or udp.SrcPort == 12354\"\n"
+    "\n"
+    "  - name: \"tcp ipv4 against port\"\n"
+    "    filter: \"tcp and (tcp.DstPort == 12354 or tcp.SrcPort == 12354)\"\n"
+    "\n"
+    "  - name: \"udp ipv4 against port\"\n"
+    "    filter: \"udp and (udp.DstPort == 12354 or udp.SrcPort == 12354)\"\n"
+    "\n"
+    "  - name: \"ipv6 all\"\n"
+    "    filter: \"ipv6\"\n";
+
 // loading up filters and fill in
 void loadConfig() {
     char path[MSG_BUFSIZE];
@@ -273,6 +356,40 @@ void loadConfig() {
     }
     snprintf(p + 1, MSG_BUFSIZE - (p - path + 1), "%s", CONFIG_FILE);
     LOG("Config path: %s", path);
+
+    // Native Win32 API check for existence, readability, and non-emptiness of config.yaml
+    DWORD attr = GetFileAttributesA(path);
+    BOOL needsGeneration = FALSE;
+    if (attr == INVALID_FILE_ATTRIBUTES) {
+        needsGeneration = TRUE;
+        LOG("config.yaml not found, will generate default template.");
+    } else {
+        FILE *tempF = fopen(path, "r");
+        if (!tempF) {
+            needsGeneration = TRUE;
+            LOG("config.yaml cannot be opened, will regenerate.");
+        } else {
+            fseek(tempF, 0, SEEK_END);
+            long size = ftell(tempF);
+            fclose(tempF);
+            if (size <= 0) {
+                needsGeneration = TRUE;
+                LOG("config.yaml is empty, will generate default template.");
+            }
+        }
+    }
+
+    if (needsGeneration) {
+        FILE *writeF = fopen(path, "w");
+        if (writeF) {
+            fprintf(writeF, "%s", default_yaml_template);
+            fclose(writeF);
+            LOG("Successfully generated config.yaml at %s", path);
+        } else {
+            LOG("Error: Failed to write config.yaml to %s", path);
+        }
+    }
+
     f = fopen(path, "r");
     filtersSize = 0;
     if (f) {
@@ -549,62 +666,7 @@ void loadConfig() {
 
     if (!f || filtersSize == 0)
     {
-        LOG("Failed to load from config. Fill in a simple default profile.");
-        // config is missing or ill-formed. fill in some simple ones
-        ProfileRecord *p = &filters[0];
-        memset(p, 0, sizeof(ProfileRecord));
-        strcpy(p->name, "loopback packets");
-        strcpy(p->filter, "outbound and ip.DstAddr >= 127.0.0.1 and ip.DstAddr <= 127.255.255.255");
-        
-        p->procFilterEnabled = FALSE;
-        p->durationEnabled = FALSE;
-        p->durationValueMs = 10;
-        
-        p->lag.enabled = FALSE;
-        p->lag.inbound = TRUE;
-        p->lag.outbound = TRUE;
-        strcpy(p->lag.time, "50");
-        
-        p->drop.enabled = FALSE;
-        p->drop.inbound = TRUE;
-        p->drop.outbound = TRUE;
-        strcpy(p->drop.chance, "10.0");
-        
-        p->throttle.enabled = FALSE;
-        p->throttle.inbound = TRUE;
-        p->throttle.outbound = TRUE;
-        strcpy(p->throttle.chance, "10.0");
-        strcpy(p->throttle.frame, "30");
-        p->throttle.drop = FALSE;
-        
-        p->duplicate.enabled = FALSE;
-        p->duplicate.inbound = TRUE;
-        p->duplicate.outbound = TRUE;
-        strcpy(p->duplicate.chance, "10.0");
-        strcpy(p->duplicate.count, "2");
-        
-        p->ood.enabled = FALSE;
-        p->ood.inbound = TRUE;
-        p->ood.outbound = TRUE;
-        strcpy(p->ood.chance, "10.0");
-        
-        p->tamper.enabled = FALSE;
-        p->tamper.inbound = TRUE;
-        p->tamper.outbound = TRUE;
-        strcpy(p->tamper.chance, "10.0");
-        p->tamper.checksum = TRUE;
-        
-        p->reset.enabled = FALSE;
-        p->reset.inbound = TRUE;
-        p->reset.outbound = TRUE;
-        strcpy(p->reset.chance, "0");
-        
-        p->bandwidth.enabled = FALSE;
-        p->bandwidth.inbound = TRUE;
-        p->bandwidth.outbound = TRUE;
-        strcpy(p->bandwidth.limit, "10");
-
-        filtersSize = 1;
+        LOG("Error: Failed to load profiles from config.yaml. No fallback presets configured in memory.");
     }
 }
 
