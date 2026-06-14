@@ -45,6 +45,10 @@ static Ihandle* dropSetupUI() {
         setFromParameter(chanceInput, "VALUE", NAME"-chance");
     }
 
+    IupSetAttribute(dropControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
+    IupSetAttribute(dropControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
+    IupSetAttribute(dropControlsBox, "CHANCE_INPUT", (char*)chanceInput);
+
     return dropControlsBox;
 }
 

@@ -11,6 +11,7 @@ localhost ipv4 udp: udp and outbound and loopback
 # more general
 all sending packets: outbound
 all receiving packets: inbound
+roblox inbound: inbound
 
 # more specific
 all ipv4 against specific ip: ip.DstAddr == 198.51.100.1 or ip.SrcAddr == 198.51.100.1

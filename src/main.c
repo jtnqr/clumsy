@@ -34,6 +34,7 @@ Ihandle *filterSelectList;
 static Ihandle *stateIcon;
 static Ihandle *timer;
 static Ihandle *timeout = NULL;
+static Ihandle *durationTimer = NULL;
 
 // Hotkey configuration
 #define HOTKEY_ID 1
@@ -51,6 +52,7 @@ static int uiStopCb(Ihandle *ih);
 static int uiStartCb(Ihandle *ih);
 static int uiTimerCb(Ihandle *ih);
 static int uiTimeoutCb(Ihandle *ih);
+static int uiDurationTimerCb(Ihandle *ih);
 static int uiListSelectCb(Ihandle *ih, char *text, int item, int state);
 static int uiFilterTextCb(Ihandle *ih);
 static void uiSetupModule(Module *module, Ihandle *parent);
@@ -263,6 +265,13 @@ EAT_SPACE:  while (isspace(*current)) { ++current; }
         filters[filtersSize].filterValue = "outbound and ip.DstAddr >= 127.0.0.1 and ip.DstAddr <= 127.255.255.255";
         filtersSize = 1;
     }
+
+    // Inject the "roblox inbound" preset explicitly
+    if (filtersSize < CONFIG_MAX_RECORDS) {
+        filters[filtersSize].filterName = "roblox inbound";
+        filters[filtersSize].filterValue = "inbound";
+        filtersSize++;
+    }
 }
 
 // Get path to state file (in same directory as executable)
@@ -357,9 +366,11 @@ static void saveState(void) {
     // Save process filter state
     {
         const char *procVal = uiGetProcessFilterTarget();
-        fprintf(f, "process-filter-target: %s\n", procVal ? procVal : "roblox");
+        fprintf(f, "process-filter-target: %s\n", procVal ? procVal : "");
         short procEnabled = uiIsProcessFilterEnabled();
         fprintf(f, "process-filter-enabled: %s\n", procEnabled ? "on" : "off");
+        fprintf(f, "process-filter-duration: %d\n", uiGetDurationValue());
+        fprintf(f, "process-filter-duration-enabled: %s\n", uiIsDurationEnabled() ? "on" : "off");
     }
 
     fclose(f);
@@ -592,7 +603,8 @@ void init(int argc, char* argv[]) {
 
     IupSetAttribute(dialog, "TITLE", "clumsy " CLUMSY_VERSION);
     IupSetAttribute(dialog, "SIZE", "540x"); // add padding manually to width (extra space for hotkey label)
-    IupSetAttribute(dialog, "RESIZE", "NO");
+    IupSetAttribute(dialog, "MINSIZE", "450x300");
+    IupSetAttribute(dialog, "RESIZE", "YES");
     IupSetCallback(dialog, "SHOW_CB", (Icallback)uiOnDialogShow);
 
 
@@ -621,6 +633,10 @@ void init(int argc, char* argv[]) {
 
     // Initialize the process filter module
     processFilterInit();
+
+    // Initialize duration timer
+    durationTimer = IupTimer();
+    IupSetCallback(durationTimer, "ACTION_CB", uiDurationTimerCb);
 }
 
 void startup() {
@@ -822,6 +838,16 @@ static int uiStartCb(Ihandle *ih) {
     IupSetCallback(filterButton, "ACTION", uiStopCb);
     IupSetAttribute(timer, "RUN", "YES");
 
+    if (uiIsDurationEnabled()) {
+        int secs = uiGetDurationValue();
+        if (secs > 0) {
+            char timeBuf[32];
+            snprintf(timeBuf, sizeof(timeBuf), "%d", secs * 1000);
+            IupStoreAttribute(durationTimer, "TIME", timeBuf);
+            IupSetAttribute(durationTimer, "RUN", "YES");
+        }
+    }
+
     return IUP_DEFAULT;
 }
 
@@ -829,6 +855,10 @@ static int uiStopCb(Ihandle *ih) {
     int ix;
     UNREFERENCED_PARAMETER(ih);
     
+    if (durationTimer) {
+        IupSetAttribute(durationTimer, "RUN", "NO");
+    }
+
     // try stopping
     IupSetAttribute(filterButton, "ACTIVE", "NO");
     IupFlush(); // flush to show disabled state
@@ -925,11 +955,87 @@ static int uiTimeoutCb(Ihandle *ih) {
     return IUP_CLOSE;
  }
 
+static int uiDurationTimerCb(Ihandle *ih) {
+    UNREFERENCED_PARAMETER(ih);
+    if (durationTimer) {
+        IupSetAttribute(durationTimer, "RUN", "NO");
+    }
+    uiStopCb(NULL);
+    return IUP_DEFAULT;
+}
+
+static void uiSetModuleState(const char *shortName, BOOL enabled, BOOL inbound, BOOL outbound, const char *valueStr) {
+    char nameBuf[128];
+    snprintf(nameBuf, sizeof(nameBuf), "toggle_%s", shortName);
+    Ihandle *toggle = IupGetHandle(nameBuf);
+    snprintf(nameBuf, sizeof(nameBuf), "controls_%s", shortName);
+    Ihandle *controls = IupGetHandle(nameBuf);
+
+    if (toggle && controls) {
+        IupSetAttribute(toggle, "VALUE", enabled ? "ON" : "OFF");
+        uiToggleControls(toggle, enabled ? 1 : 0);
+
+        Ihandle *chk_inbound = (Ihandle*)IupGetAttribute(controls, "INBOUND_CHECKBOX");
+        Ihandle *chk_outbound = (Ihandle*)IupGetAttribute(controls, "OUTBOUND_CHECKBOX");
+        
+        if (chk_inbound) {
+            IupSetAttribute(chk_inbound, "VALUE", inbound ? "ON" : "OFF");
+            short *inboundPtr = (short*)IupGetAttribute(chk_inbound, SYNCED_VALUE);
+            if (inboundPtr) InterlockedExchange16(inboundPtr, I2S(inbound ? 1 : 0));
+        }
+        if (chk_outbound) {
+            IupSetAttribute(chk_outbound, "VALUE", outbound ? "ON" : "OFF");
+            short *outboundPtr = (short*)IupGetAttribute(chk_outbound, SYNCED_VALUE);
+            if (outboundPtr) InterlockedExchange16(outboundPtr, I2S(outbound ? 1 : 0));
+        }
+
+        if (valueStr) {
+            if (strcmp(shortName, "drop") == 0) {
+                Ihandle *txt_chance = (Ihandle*)IupGetAttribute(controls, "CHANCE_INPUT");
+                if (txt_chance) {
+                    IupSetAttribute(txt_chance, "VALUE", valueStr);
+                    short *chancePtr = (short*)IupGetAttribute(txt_chance, SYNCED_VALUE);
+                    if (chancePtr) {
+                        float fVal = (float)atof(valueStr);
+                        InterlockedExchange16(chancePtr, (short)(fVal * 100));
+                    }
+                }
+            } else if (strcmp(shortName, "lag") == 0) {
+                Ihandle *txt_time = (Ihandle*)IupGetAttribute(controls, "TIME_INPUT");
+                if (txt_time) {
+                    IupSetAttribute(txt_time, "VALUE", valueStr);
+                    short *timePtr = (short*)IupGetAttribute(txt_time, SYNCED_VALUE);
+                    if (timePtr) {
+                        int iVal = atoi(valueStr);
+                        InterlockedExchange16(timePtr, (short)iVal);
+                    }
+                }
+            } else if (strcmp(shortName, "bandwidth") == 0) {
+                Ihandle *txt_limit = (Ihandle*)IupGetAttribute(controls, "BANDWIDTH_INPUT");
+                if (txt_limit) {
+                    IupSetAttribute(txt_limit, "VALUE", valueStr);
+                    LONG *limitPtr = (LONG*)IupGetAttribute(txt_limit, SYNCED_VALUE);
+                    if (limitPtr) {
+                        int iVal = atoi(valueStr);
+                        InterlockedExchange(limitPtr, iVal);
+                    }
+                }
+            }
+        }
+    }
+}
+
 static int uiListSelectCb(Ihandle *ih, char *text, int item, int state) {
     UNREFERENCED_PARAMETER(text);
     UNREFERENCED_PARAMETER(ih);
     if (state == 1) {
         IupSetAttribute(filterText, "VALUE", filters[item-1].filterValue);
+        
+        if (strcmp(filters[item-1].filterName, "roblox inbound") == 0) {
+            uiSetModuleState("drop", TRUE, TRUE, FALSE, "100.0");
+            uiSetModuleState("lag", TRUE, TRUE, FALSE, NULL);
+            uiSetModuleState("bandwidth", TRUE, TRUE, FALSE, "1");
+        }
     }
     return IUP_DEFAULT;
 }
@@ -983,6 +1089,14 @@ static void uiSetupModule(Module *module, Ihandle *parent) {
     IupSetAttribute(toggle, SYNCED_VALUE, (char*)module->enabledFlag);
     IupSetAttribute(controls, "ACTIVE", "NO"); // startup as inactive
     IupSetAttribute(controls, "NCGAP", "4"); // startup as inactive
+
+    {
+        char nameBuf[128];
+        snprintf(nameBuf, sizeof(nameBuf), "toggle_%s", module->shortName);
+        IupSetHandle(nameBuf, toggle);
+        snprintf(nameBuf, sizeof(nameBuf), "controls_%s", module->shortName);
+        IupSetHandle(nameBuf, controls);
+    }
     
     // Set tooltip on toggle
     if (tooltip) {

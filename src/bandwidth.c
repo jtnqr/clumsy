@@ -87,6 +87,10 @@ static Ihandle* bandwidthSetupUI() {
         setFromParameter(bandwidthInput, "VALUE", NAME"-bandwidth");
     }
 
+    IupSetAttribute(bandwidthControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
+    IupSetAttribute(bandwidthControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
+    IupSetAttribute(bandwidthControlsBox, "BANDWIDTH_INPUT", (char*)bandwidthInput);
+
     return bandwidthControlsBox;
 }
 

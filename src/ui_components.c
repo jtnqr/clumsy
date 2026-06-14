@@ -5,6 +5,9 @@ static Ihandle *processFilterFrame = NULL;
 static Ihandle *processFilterToggle = NULL;
 static Ihandle *processFilterText = NULL;
 static Ihandle *processFilterLabel = NULL;
+static Ihandle *processFilterDurationLabel = NULL;
+static Ihandle *processFilterDurationText = NULL;
+static Ihandle *processFilterDurationToggle = NULL;
 
 Ihandle* uiCreateProcessFilterFrame(void) {
     processFilterFrame = IupFrame(
@@ -12,14 +15,20 @@ Ihandle* uiCreateProcessFilterFrame(void) {
             processFilterLabel = IupLabel("Target Process:"),
             processFilterText = IupText(NULL),
             processFilterToggle = IupToggle("Enable Process Filter", NULL),
+            processFilterDurationLabel = IupLabel("Duration (s):"),
+            processFilterDurationText = IupText(NULL),
+            processFilterDurationToggle = IupToggle("Enable Timer", NULL),
             NULL
         )
     );
     IupSetAttribute(processFilterFrame, "TITLE", "Process Filter");
     IupSetAttribute(processFilterFrame, "EXPAND", "HORIZONTAL");
     IupSetAttribute(processFilterText, "VISIBLECOLUMNS", "12");
-    IupSetAttribute(processFilterText, "VALUE", "roblox");
+    IupSetAttribute(processFilterText, "VALUE", "");
     IupSetAttribute(processFilterToggle, "VALUE", "OFF");
+    IupSetAttribute(processFilterDurationText, "VISIBLECOLUMNS", "5");
+    IupSetAttribute(processFilterDurationText, "VALUE", "10");
+    IupSetAttribute(processFilterDurationToggle, "VALUE", "OFF");
 
     Ihandle *hbox = IupGetChild(processFilterFrame, 0);
     IupSetAttribute(hbox, "ALIGNMENT", "ACENTER");
@@ -38,6 +47,17 @@ Ihandle* uiCreateProcessFilterFrame(void) {
             IupSetAttribute(processFilterToggle, "VALUE", "OFF");
         }
     }
+    if (IupGetGlobal("process-filter-duration")) {
+        IupStoreAttribute(processFilterDurationText, "VALUE", IupGetGlobal("process-filter-duration"));
+    }
+    if (IupGetGlobal("process-filter-duration-enabled")) {
+        const char *enabled = IupGetGlobal("process-filter-duration-enabled");
+        if (strcmp(enabled, "on") == 0) {
+            IupSetAttribute(processFilterDurationToggle, "VALUE", "ON");
+        } else {
+            IupSetAttribute(processFilterDurationToggle, "VALUE", "OFF");
+        }
+    }
 
     return processFilterFrame;
 }
@@ -48,9 +68,9 @@ BOOL uiIsProcessFilterEnabled(void) {
 }
 
 const char* uiGetProcessFilterTarget(void) {
-    if (!processFilterText) return "roblox";
+    if (!processFilterText) return "";
     const char *val = IupGetAttribute(processFilterText, "VALUE");
-    return val ? val : "roblox";
+    return val ? val : "";
 }
 
 void uiSetProcessFilterActive(BOOL active) {
@@ -60,4 +80,21 @@ void uiSetProcessFilterActive(BOOL active) {
     if (processFilterToggle) {
         IupSetAttribute(processFilterToggle, "ACTIVE", active ? "YES" : "NO");
     }
+    if (processFilterDurationText) {
+        IupSetAttribute(processFilterDurationText, "ACTIVE", active ? "YES" : "NO");
+    }
+    if (processFilterDurationToggle) {
+        IupSetAttribute(processFilterDurationToggle, "ACTIVE", active ? "YES" : "NO");
+    }
+}
+
+BOOL uiIsDurationEnabled(void) {
+    if (!processFilterDurationToggle) return FALSE;
+    return IupGetInt(processFilterDurationToggle, "VALUE");
+}
+
+int uiGetDurationValue(void) {
+    if (!processFilterDurationText) return 0;
+    int val = IupGetInt(processFilterDurationText, "VALUE");
+    return val > 0 ? val : 0;
 }

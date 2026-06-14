@@ -62,6 +62,10 @@ static Ihandle *lagSetupUI() {
         setFromParameter(timeInput, "VALUE", NAME"-time");
     }
 
+    IupSetAttribute(lagControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
+    IupSetAttribute(lagControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
+    IupSetAttribute(lagControlsBox, "TIME_INPUT", (char*)timeInput);
+
     return lagControlsBox;
 }
 

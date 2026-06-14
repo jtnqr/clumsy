@@ -13,3 +13,9 @@ const char* uiGetProcessFilterTarget(void);
 
 // Enables or disables the process filter UI input controls
 void uiSetProcessFilterActive(BOOL active);
+
+// Returns TRUE if the duration timer toggle is checked (enabled)
+BOOL uiIsDurationEnabled(void);
+
+// Retrieves the duration value entered in the text box (in seconds)
+int uiGetDurationValue(void);
