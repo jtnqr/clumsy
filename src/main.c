@@ -61,16 +61,84 @@ static void parseHotkeyConfig(const char* hotkeyStr);
 static void formatHotkeyString(char* buf, size_t bufSize);
 
 // serializing config files using a stupid custom format
-#define CONFIG_FILE "config.txt"
+#define CONFIG_FILE "config.yaml"
 #define STATE_FILE "state.txt"
 #define CONFIG_MAX_RECORDS 64
-#define CONFIG_BUF_SIZE 4096
+#define CONFIG_BUF_SIZE 16384
+
 typedef struct {
-    char* filterName;
-    char* filterValue;
-} filterRecord;
+    char name[128];
+    char filter[1024];
+    
+    BOOL procFilterEnabled;
+    char procFilterTarget[128];
+    BOOL durationEnabled;
+    int durationValueMs;
+    
+    struct {
+        BOOL enabled;
+        BOOL inbound;
+        BOOL outbound;
+        char time[64];
+    } lag;
+    
+    struct {
+        BOOL enabled;
+        BOOL inbound;
+        BOOL outbound;
+        char chance[64];
+    } drop;
+    
+    struct {
+        BOOL enabled;
+        BOOL inbound;
+        BOOL outbound;
+        char chance[64];
+        char frame[64];
+        BOOL drop;
+    } throttle;
+    
+    struct {
+        BOOL enabled;
+        BOOL inbound;
+        BOOL outbound;
+        char chance[64];
+        char count[64];
+    } duplicate;
+    
+    struct {
+        BOOL enabled;
+        BOOL inbound;
+        BOOL outbound;
+        char chance[64];
+    } ood;
+    
+    struct {
+        BOOL enabled;
+        BOOL inbound;
+        BOOL outbound;
+        char chance[64];
+        BOOL checksum;
+    } tamper;
+    
+    struct {
+        BOOL enabled;
+        BOOL inbound;
+        BOOL outbound;
+        char chance[64];
+    } reset;
+    
+    struct {
+        BOOL enabled;
+        BOOL inbound;
+        BOOL outbound;
+        char limit[64];
+    } bandwidth;
+} ProfileRecord;
+
 UINT filtersSize;
-filterRecord filters[CONFIG_MAX_RECORDS] = {0};
+ProfileRecord filters[CONFIG_MAX_RECORDS] = {0};
+static void uiApplyProfile(ProfileRecord *p);
 char configBuf[CONFIG_BUF_SIZE+2]; // add some padding to write \n
 BOOL parameterized = 0; // parameterized flag, means reading args from command line
 static BOOL stateLoaded = 0; // flag to indicate state was loaded (don't auto-start)
@@ -206,9 +274,9 @@ void loadConfig() {
     snprintf(p + 1, MSG_BUFSIZE - (p - path + 1), "%s", CONFIG_FILE);
     LOG("Config path: %s", path);
     f = fopen(path, "r");
+    filtersSize = 0;
     if (f) {
         size_t len;
-        char *current, *last;
         len = fread(configBuf, sizeof(char), CONFIG_BUF_SIZE, f);
         if (len == CONFIG_BUF_SIZE) {
             LOG("Config file is larger than %d bytes, get truncated.", CONFIG_BUF_SIZE);
@@ -216,61 +284,327 @@ void loadConfig() {
         // always patch in a newline at the end to ease parsing
         configBuf[len] = '\n';
         configBuf[len+1] = '\0';
+        fclose(f);
 
-        // parse out the kv pairs. isn't quite safe
-        filtersSize = 0;
-        last = current = configBuf;
-        do {
-            // eat up empty lines
-EAT_SPACE:  while (isspace(*current)) { ++current; }
-            if (*current == '#') {
-                current = strchr(current, '\n');
-                if (!current) break;
-                current = current + 1;
-                goto EAT_SPACE;
+        // parse out YAML structure
+        char *line = configBuf;
+        
+        // Stack to track current section hierarchy
+        struct {
+            int indent;
+            char name[64];
+        } stack[16];
+        int stack_depth = 0;
+
+        while (line && *line != '\0') {
+            char *next_line = strchr(line, '\n');
+            if (next_line) {
+                *next_line = '\0';
+                next_line++;
             }
-
-            // now we can start
-            last = current;
-            current = strchr(last, ':');
-            if (!current) break;
-            *current = '\0';
-            filters[filtersSize].filterName = last;
-            current += 1;
-            while (isspace(*current)) { ++current; } // eat potential space after :
-            last = current;
-            current = strchr(last, '\n');
-            if (!current) break;
-            filters[filtersSize].filterValue = last;
-            *current = '\0';
-            if (*(current-1) == '\r') *(current-1) = 0;
-            last = current = current + 1;
             
-            // Check if this is the hotkey config (not a filter preset)
-            if (strcmp(filters[filtersSize].filterName, "hotkey") == 0) {
-                parseHotkeyConfig(filters[filtersSize].filterValue);
-                // Don't increment filtersSize - this isn't a filter preset
-            } else {
-                ++filtersSize;
+            // Trim trailing carriage return
+            size_t line_len = strlen(line);
+            if (line_len > 0 && line[line_len - 1] == '\r') {
+                line[line_len - 1] = '\0';
             }
-        } while (last && last - configBuf < CONFIG_BUF_SIZE);
-        LOG("Loaded %u records.", filtersSize);
+
+            // 1. Calculate indentation (leading spaces)
+            int indent = 0;
+            char *p_line = line;
+            while (*p_line == ' ' || *p_line == '\t') {
+                if (*p_line == '\t') indent += 4;
+                else indent++;
+                p_line++;
+            }
+
+            // Skip empty or comment lines
+            if (*p_line == '\0' || *p_line == '#') {
+                line = next_line;
+                continue;
+            }
+
+            // 2. Handle list item prefix "- " if present
+            BOOL is_list_item = FALSE;
+            if (p_line[0] == '-' && p_line[1] == ' ') {
+                is_list_item = TRUE;
+                p_line += 2;
+                while (*p_line == ' ') {
+                    p_line++;
+                }
+            }
+
+            // 3. Split into key and value
+            char *colon = strchr(p_line, ':');
+            if (!colon) {
+                line = next_line;
+                continue;
+            }
+
+            *colon = '\0';
+            char *key = p_line;
+            char *value = colon + 1;
+
+            // Trim spaces from key
+            while (*key == ' ') key++;
+            char *key_end = key + strlen(key) - 1;
+            while (key_end > key && *key_end == ' ') {
+                *key_end = '\0';
+                key_end--;
+            }
+
+            // Trim spaces from value
+            while (*value == ' ') value++;
+            char *value_end = value + strlen(value) - 1;
+            while (value_end > value && *value_end == ' ') {
+                *value_end = '\0';
+                value_end--;
+            }
+
+            // Remove surrounding quotes from value
+            if (strlen(value) >= 2 && ((value[0] == '"' && value[value_end - value] == '"') || (value[0] == '\'' && value[value_end - value] == '\''))) {
+                value[value_end - value] = '\0';
+                value++;
+            }
+
+            // 4. Update stack based on current indent level
+            while (stack_depth > 0 && stack[stack_depth - 1].indent >= indent) {
+                stack_depth--;
+            }
+
+            // 5. If this is a section header (value is empty), push to stack
+            if (*value == '\0') {
+                if (stack_depth < 16) {
+                    stack[stack_depth].indent = indent;
+                    strncpy(stack[stack_depth].name, key, 63);
+                    stack[stack_depth].name[63] = '\0';
+                    stack_depth++;
+                }
+                line = next_line;
+                continue;
+            }
+
+            // 6. Process key-value pair!
+            if (is_list_item && strcmp(key, "name") == 0) {
+                if (filtersSize < CONFIG_MAX_RECORDS) {
+                    ProfileRecord *p = &filters[filtersSize];
+                    memset(p, 0, sizeof(ProfileRecord));
+                    
+                    // Initialize with baseline defaults
+                    p->procFilterEnabled = FALSE;
+                    p->procFilterTarget[0] = '\0';
+                    p->durationEnabled = FALSE;
+                    p->durationValueMs = 10;
+                    
+                    p->lag.enabled = FALSE;
+                    p->lag.inbound = TRUE;
+                    p->lag.outbound = TRUE;
+                    strcpy(p->lag.time, "50");
+                    
+                    p->drop.enabled = FALSE;
+                    p->drop.inbound = TRUE;
+                    p->drop.outbound = TRUE;
+                    strcpy(p->drop.chance, "10.0");
+                    
+                    p->throttle.enabled = FALSE;
+                    p->throttle.inbound = TRUE;
+                    p->throttle.outbound = TRUE;
+                    strcpy(p->throttle.chance, "10.0");
+                    strcpy(p->throttle.frame, "30");
+                    p->throttle.drop = FALSE;
+                    
+                    p->duplicate.enabled = FALSE;
+                    p->duplicate.inbound = TRUE;
+                    p->duplicate.outbound = TRUE;
+                    strcpy(p->duplicate.chance, "10.0");
+                    strcpy(p->duplicate.count, "2");
+                    
+                    p->ood.enabled = FALSE;
+                    p->ood.inbound = TRUE;
+                    p->ood.outbound = TRUE;
+                    strcpy(p->ood.chance, "10.0");
+                    
+                    p->tamper.enabled = FALSE;
+                    p->tamper.inbound = TRUE;
+                    p->tamper.outbound = TRUE;
+                    strcpy(p->tamper.chance, "10.0");
+                    p->tamper.checksum = TRUE;
+                    
+                    p->reset.enabled = FALSE;
+                    p->reset.inbound = TRUE;
+                    p->reset.outbound = TRUE;
+                    strcpy(p->reset.chance, "0");
+                    
+                    p->bandwidth.enabled = FALSE;
+                    p->bandwidth.inbound = TRUE;
+                    p->bandwidth.outbound = TRUE;
+                    strcpy(p->bandwidth.limit, "10");
+
+                    strncpy(p->name, value, 127);
+                    p->name[127] = '\0';
+                    filtersSize++;
+                }
+            }
+
+            if (stack_depth == 0) {
+                if (strcmp(key, "hotkey") == 0) {
+                    parseHotkeyConfig(value);
+                    strncpy(hotkeyConfigStr, value, sizeof(hotkeyConfigStr)-1);
+                }
+            } else if (filtersSize > 0) {
+                ProfileRecord *p = &filters[filtersSize - 1];
+                
+                BOOL under_profiles = FALSE;
+                BOOL under_proc_filter = FALSE;
+                BOOL under_duration = FALSE;
+                BOOL under_modules = FALSE;
+                char current_module[64] = "";
+
+                for (int i = 0; i < stack_depth; i++) {
+                    if (strcmp(stack[i].name, "profiles") == 0) {
+                        under_profiles = TRUE;
+                    } else if (strcmp(stack[i].name, "process_filter") == 0) {
+                        under_proc_filter = TRUE;
+                    } else if (strcmp(stack[i].name, "duration") == 0) {
+                        under_duration = TRUE;
+                    } else if (strcmp(stack[i].name, "modules") == 0) {
+                        under_modules = TRUE;
+                    } else if (under_modules) {
+                        strncpy(current_module, stack[i].name, sizeof(current_module)-1);
+                    }
+                }
+
+                if (under_profiles) {
+                    if (under_modules && current_module[0] != '\0') {
+                        BOOL val_bool = (strcmp(value, "true") == 0 || strcmp(value, "on") == 0 || strcmp(value, "1") == 0);
+                        
+                        if (strcmp(current_module, "lag") == 0) {
+                            if (strcmp(key, "enabled") == 0) p->lag.enabled = val_bool;
+                            else if (strcmp(key, "inbound") == 0) p->lag.inbound = val_bool;
+                            else if (strcmp(key, "outbound") == 0) p->lag.outbound = val_bool;
+                            else if (strcmp(key, "time") == 0) strncpy(p->lag.time, value, sizeof(p->lag.time)-1);
+                        } else if (strcmp(current_module, "drop") == 0) {
+                            if (strcmp(key, "enabled") == 0) p->drop.enabled = val_bool;
+                            else if (strcmp(key, "inbound") == 0) p->drop.inbound = val_bool;
+                            else if (strcmp(key, "outbound") == 0) p->drop.outbound = val_bool;
+                            else if (strcmp(key, "chance") == 0) strncpy(p->drop.chance, value, sizeof(p->drop.chance)-1);
+                        } else if (strcmp(current_module, "throttle") == 0) {
+                            if (strcmp(key, "enabled") == 0) p->throttle.enabled = val_bool;
+                            else if (strcmp(key, "inbound") == 0) p->throttle.inbound = val_bool;
+                            else if (strcmp(key, "outbound") == 0) p->throttle.outbound = val_bool;
+                            else if (strcmp(key, "chance") == 0) strncpy(p->throttle.chance, value, sizeof(p->throttle.chance)-1);
+                            else if (strcmp(key, "frame") == 0) strncpy(p->throttle.frame, value, sizeof(p->throttle.frame)-1);
+                            else if (strcmp(key, "drop") == 0) p->throttle.drop = val_bool;
+                        } else if (strcmp(current_module, "duplicate") == 0) {
+                            if (strcmp(key, "enabled") == 0) p->duplicate.enabled = val_bool;
+                            else if (strcmp(key, "inbound") == 0) p->duplicate.inbound = val_bool;
+                            else if (strcmp(key, "outbound") == 0) p->duplicate.outbound = val_bool;
+                            else if (strcmp(key, "chance") == 0) strncpy(p->duplicate.chance, value, sizeof(p->duplicate.chance)-1);
+                            else if (strcmp(key, "count") == 0) strncpy(p->duplicate.count, value, sizeof(p->duplicate.count)-1);
+                        } else if (strcmp(current_module, "ood") == 0) {
+                            if (strcmp(key, "enabled") == 0) p->ood.enabled = val_bool;
+                            else if (strcmp(key, "inbound") == 0) p->ood.inbound = val_bool;
+                            else if (strcmp(key, "outbound") == 0) p->ood.outbound = val_bool;
+                            else if (strcmp(key, "chance") == 0) strncpy(p->ood.chance, value, sizeof(p->ood.chance)-1);
+                        } else if (strcmp(current_module, "tamper") == 0) {
+                            if (strcmp(key, "enabled") == 0) p->tamper.enabled = val_bool;
+                            else if (strcmp(key, "inbound") == 0) p->tamper.inbound = val_bool;
+                            else if (strcmp(key, "outbound") == 0) p->tamper.outbound = val_bool;
+                            else if (strcmp(key, "chance") == 0) strncpy(p->tamper.chance, value, sizeof(p->tamper.chance)-1);
+                            else if (strcmp(key, "checksum") == 0) p->tamper.checksum = val_bool;
+                        } else if (strcmp(current_module, "reset") == 0) {
+                            if (strcmp(key, "enabled") == 0) p->reset.enabled = val_bool;
+                            else if (strcmp(key, "inbound") == 0) p->reset.inbound = val_bool;
+                            else if (strcmp(key, "outbound") == 0) p->reset.outbound = val_bool;
+                            else if (strcmp(key, "chance") == 0) strncpy(p->reset.chance, value, sizeof(p->reset.chance)-1);
+                        } else if (strcmp(current_module, "bandwidth") == 0) {
+                            if (strcmp(key, "enabled") == 0) p->bandwidth.enabled = val_bool;
+                            else if (strcmp(key, "inbound") == 0) p->bandwidth.inbound = val_bool;
+                            else if (strcmp(key, "outbound") == 0) p->bandwidth.outbound = val_bool;
+                            else if (strcmp(key, "limit") == 0) strncpy(p->bandwidth.limit, value, sizeof(p->bandwidth.limit)-1);
+                        }
+                    } else if (under_proc_filter) {
+                        BOOL val_bool = (strcmp(value, "true") == 0 || strcmp(value, "on") == 0 || strcmp(value, "1") == 0);
+                        if (under_duration) {
+                            if (strcmp(key, "enabled") == 0) p->durationEnabled = val_bool;
+                            else if (strcmp(key, "value_ms") == 0) p->durationValueMs = atoi(value);
+                        } else {
+                            if (strcmp(key, "enabled") == 0) p->procFilterEnabled = val_bool;
+                            else if (strcmp(key, "target") == 0) strncpy(p->procFilterTarget, value, sizeof(p->procFilterTarget)-1);
+                        }
+                    } else {
+                        if (strcmp(key, "filter") == 0) {
+                            strncpy(p->filter, value, sizeof(p->filter)-1);
+                        } else if (strcmp(key, "name") == 0 && !is_list_item) {
+                            strncpy(p->name, value, sizeof(p->name)-1);
+                        }
+                    }
+                }
+            }
+
+            line = next_line;
+        }
+        LOG("Loaded %u records from YAML.", filtersSize);
     }
 
     if (!f || filtersSize == 0)
     {
-        LOG("Failed to load from config. Fill in a simple one.");
+        LOG("Failed to load from config. Fill in a simple default profile.");
         // config is missing or ill-formed. fill in some simple ones
-        filters[filtersSize].filterName = "loopback packets";
-        filters[filtersSize].filterValue = "outbound and ip.DstAddr >= 127.0.0.1 and ip.DstAddr <= 127.255.255.255";
-        filtersSize = 1;
-    }
+        ProfileRecord *p = &filters[0];
+        memset(p, 0, sizeof(ProfileRecord));
+        strcpy(p->name, "loopback packets");
+        strcpy(p->filter, "outbound and ip.DstAddr >= 127.0.0.1 and ip.DstAddr <= 127.255.255.255");
+        
+        p->procFilterEnabled = FALSE;
+        p->durationEnabled = FALSE;
+        p->durationValueMs = 10;
+        
+        p->lag.enabled = FALSE;
+        p->lag.inbound = TRUE;
+        p->lag.outbound = TRUE;
+        strcpy(p->lag.time, "50");
+        
+        p->drop.enabled = FALSE;
+        p->drop.inbound = TRUE;
+        p->drop.outbound = TRUE;
+        strcpy(p->drop.chance, "10.0");
+        
+        p->throttle.enabled = FALSE;
+        p->throttle.inbound = TRUE;
+        p->throttle.outbound = TRUE;
+        strcpy(p->throttle.chance, "10.0");
+        strcpy(p->throttle.frame, "30");
+        p->throttle.drop = FALSE;
+        
+        p->duplicate.enabled = FALSE;
+        p->duplicate.inbound = TRUE;
+        p->duplicate.outbound = TRUE;
+        strcpy(p->duplicate.chance, "10.0");
+        strcpy(p->duplicate.count, "2");
+        
+        p->ood.enabled = FALSE;
+        p->ood.inbound = TRUE;
+        p->ood.outbound = TRUE;
+        strcpy(p->ood.chance, "10.0");
+        
+        p->tamper.enabled = FALSE;
+        p->tamper.inbound = TRUE;
+        p->tamper.outbound = TRUE;
+        strcpy(p->tamper.chance, "10.0");
+        p->tamper.checksum = TRUE;
+        
+        p->reset.enabled = FALSE;
+        p->reset.inbound = TRUE;
+        p->reset.outbound = TRUE;
+        strcpy(p->reset.chance, "0");
+        
+        p->bandwidth.enabled = FALSE;
+        p->bandwidth.inbound = TRUE;
+        p->bandwidth.outbound = TRUE;
+        strcpy(p->bandwidth.limit, "10");
 
-    // Inject the "roblox inbound" preset explicitly
-    if (filtersSize < CONFIG_MAX_RECORDS) {
-        filters[filtersSize].filterName = "roblox inbound";
-        filters[filtersSize].filterValue = "inbound";
-        filtersSize++;
+        filtersSize = 1;
     }
 }
 
@@ -541,12 +875,15 @@ void init(int argc, char* argv[]) {
     for (ix = 0; ix < filtersSize; ++ix) {
         char ixBuf[4];
         sprintf(ixBuf, "%d", ix+1); // ! staring from 1, following lua indexing
-        IupStoreAttribute(filterSelectList, ixBuf, filters[ix].filterName);
+        IupStoreAttribute(filterSelectList, ixBuf, filters[ix].name);
     }
     IupSetAttribute(filterSelectList, "VALUE", "1");
     IupSetCallback(filterSelectList, "ACTION", (Icallback)uiListSelectCb);
-    // set filter text value since the callback won't take effect before main loop starts
-    IupSetAttribute(filterText, "VALUE", filters[0].filterValue);
+
+    // Apply the first profile on startup if state was not loaded
+    if (filtersSize > 0 && !stateLoaded) {
+        uiApplyProfile(&filters[0]);
+    }
     
     // If state was loaded, restore the saved filter text and deselect preset
     if (stateLoaded) {
@@ -839,10 +1176,10 @@ static int uiStartCb(Ihandle *ih) {
     IupSetAttribute(timer, "RUN", "YES");
 
     if (uiIsDurationEnabled()) {
-        int secs = uiGetDurationValue();
-        if (secs > 0) {
+        int ms = uiGetDurationValue();
+        if (ms > 0) {
             char timeBuf[32];
-            snprintf(timeBuf, sizeof(timeBuf), "%d", secs * 1000);
+            snprintf(timeBuf, sizeof(timeBuf), "%d", ms);
             IupStoreAttribute(durationTimer, "TIME", timeBuf);
             IupSetAttribute(durationTimer, "RUN", "YES");
         }
@@ -1025,17 +1362,201 @@ static void uiSetModuleState(const char *shortName, BOOL enabled, BOOL inbound, 
     }
 }
 
+static void uiApplyProfile(ProfileRecord *p) {
+    // 1. Set filter text
+    IupSetAttribute(filterText, "VALUE", p->filter);
+
+    // 2. Set process filter settings
+    Ihandle *proc_text = IupGetHandle("process_filter_text");
+    Ihandle *proc_toggle = IupGetHandle("process_filter_toggle");
+    Ihandle *dur_text = IupGetHandle("process_filter_duration_text");
+    Ihandle *dur_toggle = IupGetHandle("process_filter_duration_toggle");
+
+    if (proc_text) IupSetAttribute(proc_text, "VALUE", p->procFilterTarget);
+    if (proc_toggle) {
+        IupSetAttribute(proc_toggle, "VALUE", p->procFilterEnabled ? "ON" : "OFF");
+    }
+    if (dur_text) {
+        char durBuf[32];
+        snprintf(durBuf, sizeof(durBuf), "%d", p->durationValueMs);
+        IupSetAttribute(dur_text, "VALUE", durBuf);
+    }
+    if (dur_toggle) {
+        IupSetAttribute(dur_toggle, "VALUE", p->durationEnabled ? "ON" : "OFF");
+    }
+
+    // 3. Set modules
+    for (int i = 0; i < MODULE_CNT; i++) {
+        Module *m = modules[i];
+        const char *name = m->shortName;
+        
+        char nameBuf[128];
+        snprintf(nameBuf, sizeof(nameBuf), "toggle_%s", name);
+        Ihandle *toggle = IupGetHandle(nameBuf);
+        snprintf(nameBuf, sizeof(nameBuf), "controls_%s", name);
+        Ihandle *controls = IupGetHandle(nameBuf);
+
+        if (!toggle || !controls) continue;
+
+        BOOL enabled = FALSE;
+        BOOL inbound = TRUE;
+        BOOL outbound = TRUE;
+        const char *val1 = NULL;
+        const char *val2 = NULL;
+        BOOL boolVal = FALSE;
+
+        // Fetch settings from ProfileRecord based on module name
+        if (strcmp(name, "lag") == 0) {
+            enabled = p->lag.enabled;
+            inbound = p->lag.inbound;
+            outbound = p->lag.outbound;
+            val1 = p->lag.time;
+        } else if (strcmp(name, "drop") == 0) {
+            enabled = p->drop.enabled;
+            inbound = p->drop.inbound;
+            outbound = p->drop.outbound;
+            val1 = p->drop.chance;
+        } else if (strcmp(name, "throttle") == 0) {
+            enabled = p->throttle.enabled;
+            inbound = p->throttle.inbound;
+            outbound = p->throttle.outbound;
+            val1 = p->throttle.chance;
+            val2 = p->throttle.frame;
+            boolVal = p->throttle.drop;
+        } else if (strcmp(name, "duplicate") == 0) {
+            enabled = p->duplicate.enabled;
+            inbound = p->duplicate.inbound;
+            outbound = p->duplicate.outbound;
+            val1 = p->duplicate.chance;
+            val2 = p->duplicate.count;
+        } else if (strcmp(name, "ood") == 0) {
+            enabled = p->ood.enabled;
+            inbound = p->ood.inbound;
+            outbound = p->ood.outbound;
+            val1 = p->ood.chance;
+        } else if (strcmp(name, "tamper") == 0) {
+            enabled = p->tamper.enabled;
+            inbound = p->tamper.inbound;
+            outbound = p->tamper.outbound;
+            val1 = p->tamper.chance;
+            boolVal = p->tamper.checksum;
+        } else if (strcmp(name, "reset") == 0) {
+            enabled = p->reset.enabled;
+            inbound = p->reset.inbound;
+            outbound = p->reset.outbound;
+            val1 = p->reset.chance;
+        } else if (strcmp(name, "bandwidth") == 0) {
+            enabled = p->bandwidth.enabled;
+            inbound = p->bandwidth.inbound;
+            outbound = p->bandwidth.outbound;
+            val1 = p->bandwidth.limit;
+        }
+
+        // Apply enabled state
+        IupSetAttribute(toggle, "VALUE", enabled ? "ON" : "OFF");
+        IupSetAttribute(controls, "ACTIVE", enabled ? "YES" : "NO");
+        short *enabledPtr = (short*)IupGetAttribute(toggle, SYNCED_VALUE);
+        if (enabledPtr) {
+            InterlockedExchange16(enabledPtr, I2S(enabled ? 1 : 0));
+        }
+
+        // Apply inbound/outbound checkboxes
+        Ihandle *chk_inbound = (Ihandle*)IupGetAttribute(controls, "INBOUND_CHECKBOX");
+        Ihandle *chk_outbound = (Ihandle*)IupGetAttribute(controls, "OUTBOUND_CHECKBOX");
+        if (chk_inbound) {
+            IupSetAttribute(chk_inbound, "VALUE", inbound ? "ON" : "OFF");
+            short *inboundPtr = (short*)IupGetAttribute(chk_inbound, SYNCED_VALUE);
+            if (inboundPtr) InterlockedExchange16(inboundPtr, I2S(inbound ? 1 : 0));
+        }
+        if (chk_outbound) {
+            IupSetAttribute(chk_outbound, "VALUE", outbound ? "ON" : "OFF");
+            short *outboundPtr = (short*)IupGetAttribute(chk_outbound, SYNCED_VALUE);
+            if (outboundPtr) InterlockedExchange16(outboundPtr, I2S(outbound ? 1 : 0));
+        }
+
+        // Apply primary value
+        if (val1) {
+            if (strcmp(name, "drop") == 0 || strcmp(name, "throttle") == 0 || strcmp(name, "duplicate") == 0 ||
+                strcmp(name, "ood") == 0 || strcmp(name, "tamper") == 0 || strcmp(name, "reset") == 0) {
+                Ihandle *chance_input = (Ihandle*)IupGetAttribute(controls, "CHANCE_INPUT");
+                if (chance_input) {
+                    IupSetAttribute(chance_input, "VALUE", val1);
+                    short *chancePtr = (short*)IupGetAttribute(chance_input, SYNCED_VALUE);
+                    if (chancePtr) {
+                        float fVal = (float)atof(val1);
+                        InterlockedExchange16(chancePtr, (short)(fVal * 100));
+                    }
+                }
+            } else if (strcmp(name, "lag") == 0) {
+                Ihandle *time_input = (Ihandle*)IupGetAttribute(controls, "TIME_INPUT");
+                if (time_input) {
+                    IupSetAttribute(time_input, "VALUE", val1);
+                    short *timePtr = (short*)IupGetAttribute(time_input, SYNCED_VALUE);
+                    if (timePtr) {
+                        int iVal = atoi(val1);
+                        InterlockedExchange16(timePtr, (short)iVal);
+                    }
+                }
+            } else if (strcmp(name, "bandwidth") == 0) {
+                Ihandle *bw_input = (Ihandle*)IupGetAttribute(controls, "BANDWIDTH_INPUT");
+                if (bw_input) {
+                    IupSetAttribute(bw_input, "VALUE", val1);
+                    LONG *bwPtr = (LONG*)IupGetAttribute(bw_input, SYNCED_VALUE);
+                    if (bwPtr) {
+                        int iVal = atoi(val1);
+                        InterlockedExchange(bwPtr, iVal);
+                    }
+                }
+            }
+        }
+
+        // Apply module-specific inputs
+        if (strcmp(name, "throttle") == 0) {
+            if (val2) {
+                Ihandle *frame_input = (Ihandle*)IupGetAttribute(controls, "FRAME_INPUT");
+                if (frame_input) {
+                    IupSetAttribute(frame_input, "VALUE", val2);
+                    short *framePtr = (short*)IupGetAttribute(frame_input, SYNCED_VALUE);
+                    if (framePtr) {
+                        int iVal = atoi(val2);
+                        InterlockedExchange16(framePtr, (short)iVal);
+                    }
+                }
+            }
+            Ihandle *drop_chk = (Ihandle*)IupGetAttribute(controls, "DROP_THROTTLED_CHECKBOX");
+            if (drop_chk) {
+                IupSetAttribute(drop_chk, "VALUE", boolVal ? "ON" : "OFF");
+                short *dropPtr = (short*)IupGetAttribute(drop_chk, SYNCED_VALUE);
+                if (dropPtr) InterlockedExchange16(dropPtr, I2S(boolVal ? 1 : 0));
+            }
+        } else if (strcmp(name, "duplicate") == 0) {
+            if (val2) {
+                Ihandle *count_input = (Ihandle*)IupGetAttribute(controls, "COUNT_INPUT");
+                if (count_input) {
+                    IupSetAttribute(count_input, "VALUE", val2);
+                    short *countPtr = (short*)IupGetAttribute(count_input, SYNCED_VALUE);
+                    if (countPtr) {
+                        int iVal = atoi(val2);
+                        InterlockedExchange16(countPtr, (short)iVal);
+                    }
+                }
+            }
+        } else if (strcmp(name, "tamper") == 0) {
+            Ihandle *checksum_chk = (Ihandle*)IupGetAttribute(controls, "CHECKSUM_CHECKBOX");
+            if (checksum_chk) {
+                IupSetAttribute(checksum_chk, "VALUE", boolVal ? "ON" : "OFF");
+                short *chkPtr = (short*)IupGetAttribute(checksum_chk, SYNCED_VALUE);
+                if (chkPtr) InterlockedExchange16(chkPtr, I2S(boolVal ? 1 : 0));
+            }
+        }
+    }
+}
+
 static int uiListSelectCb(Ihandle *ih, char *text, int item, int state) {
     UNREFERENCED_PARAMETER(text);
     UNREFERENCED_PARAMETER(ih);
     if (state == 1) {
-        IupSetAttribute(filterText, "VALUE", filters[item-1].filterValue);
-        
-        if (strcmp(filters[item-1].filterName, "roblox inbound") == 0) {
-            uiSetModuleState("drop", TRUE, TRUE, FALSE, "100.0");
-            uiSetModuleState("lag", TRUE, TRUE, FALSE, NULL);
-            uiSetModuleState("bandwidth", TRUE, TRUE, FALSE, "1");
-        }
+        uiApplyProfile(&filters[item-1]);
     }
     return IUP_DEFAULT;
 }

@@ -52,6 +52,11 @@ static Ihandle* tamperSetupUI() {
         setFromParameter(checksumCheckbox, "VALUE", NAME"-checksum");
     }
 
+    IupSetAttribute(dupControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
+    IupSetAttribute(dupControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
+    IupSetAttribute(dupControlsBox, "CHANCE_INPUT", (char*)chanceInput);
+    IupSetAttribute(dupControlsBox, "CHECKSUM_CHECKBOX", (char*)checksumCheckbox);
+
     return dupControlsBox;
 }
 

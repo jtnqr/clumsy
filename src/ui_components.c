@@ -15,7 +15,7 @@ Ihandle* uiCreateProcessFilterFrame(void) {
             processFilterLabel = IupLabel("Target Process:"),
             processFilterText = IupText(NULL),
             processFilterToggle = IupToggle("Enable Process Filter", NULL),
-            processFilterDurationLabel = IupLabel("Duration (s):"),
+            processFilterDurationLabel = IupLabel("Duration (ms):"),
             processFilterDurationText = IupText(NULL),
             processFilterDurationToggle = IupToggle("Enable Timer", NULL),
             NULL
@@ -29,6 +29,11 @@ Ihandle* uiCreateProcessFilterFrame(void) {
     IupSetAttribute(processFilterDurationText, "VISIBLECOLUMNS", "5");
     IupSetAttribute(processFilterDurationText, "VALUE", "10");
     IupSetAttribute(processFilterDurationToggle, "VALUE", "OFF");
+
+    IupSetHandle("process_filter_text", processFilterText);
+    IupSetHandle("process_filter_toggle", processFilterToggle);
+    IupSetHandle("process_filter_duration_text", processFilterDurationText);
+    IupSetHandle("process_filter_duration_toggle", processFilterDurationToggle);
 
     Ihandle *hbox = IupGetChild(processFilterFrame, 0);
     IupSetAttribute(hbox, "ALIGNMENT", "ACENTER");

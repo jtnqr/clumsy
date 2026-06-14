@@ -58,6 +58,11 @@ static Ihandle* dupSetupUI() {
         setFromParameter(countInput, "VALUE", NAME"-count");
     }
 
+    IupSetAttribute(dupControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
+    IupSetAttribute(dupControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
+    IupSetAttribute(dupControlsBox, "CHANCE_INPUT", (char*)chanceInput);
+    IupSetAttribute(dupControlsBox, "COUNT_INPUT", (char*)countInput);
+
     return dupControlsBox;
 }
 

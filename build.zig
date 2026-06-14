@@ -119,7 +119,7 @@ pub fn build(b: *std.Build) void {
         // Install required DLL, SYS, and config files to zig-out/<arch>/
         b.installFile(b.fmt("external/{s}/{s}/WinDivert.dll", .{windivert_dir, t.arch_dir}), b.fmt("{s}/WinDivert.dll", .{t.name}));
         b.installFile(b.fmt("external/{s}/{s}/{s}", .{windivert_dir, t.arch_dir, t.windivert_sys}), b.fmt("{s}/{s}", .{t.name, t.windivert_sys}));
-        b.installFile("etc/config.txt", b.fmt("{s}/config.txt", .{t.name}));
+        b.installFile("etc/config.yaml", b.fmt("{s}/config.yaml", .{t.name}));
         
         if (conf == .Ship) {
             b.installFile("LICENSE", b.fmt("{s}/License.txt", .{t.name}));

@@ -63,6 +63,10 @@ static Ihandle* resetSetupUI() {
         setFromParameter(chanceInput, "VALUE", NAME"-chance");
     }
 
+    IupSetAttribute(dupControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
+    IupSetAttribute(dupControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
+    IupSetAttribute(dupControlsBox, "CHANCE_INPUT", (char*)chanceInput);
+
     return dupControlsBox;
 }
 

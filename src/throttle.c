@@ -78,6 +78,12 @@ static Ihandle *throttleSetupUI() {
         setFromParameter(frameInput, "VALUE", NAME"-frame");
     }
 
+    IupSetAttribute(throttleControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
+    IupSetAttribute(throttleControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
+    IupSetAttribute(throttleControlsBox, "CHANCE_INPUT", (char*)chanceInput);
+    IupSetAttribute(throttleControlsBox, "FRAME_INPUT", (char*)frameInput);
+    IupSetAttribute(throttleControlsBox, "DROP_THROTTLED_CHECKBOX", (char*)dropThrottledCheckbox);
+
     return throttleControlsBox;
 }
 

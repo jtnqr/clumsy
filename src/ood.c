@@ -47,6 +47,10 @@ static Ihandle *oodSetupUI() {
         setFromParameter(chanceInput, "VALUE", NAME"-chance");
     }
 
+    IupSetAttribute(oodControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
+    IupSetAttribute(oodControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
+    IupSetAttribute(oodControlsBox, "CHANCE_INPUT", (char*)chanceInput);
+
     return oodControlsBox;
 }
 

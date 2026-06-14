@@ -1,0 +1,60 @@
+hotkey: "f6"
+
+profiles:
+  - name: "roblox inbound"
+    filter: "inbound"
+    process_filter:
+      enabled: true
+      target: "roblox"
+      duration:
+        enabled: false
+        value_ms: 10
+      modules:
+        drop:
+          enabled: true
+          inbound: true
+          outbound: false
+          chance: 100.0
+        bandwidth:
+          enabled: true
+          inbound: true
+          outbound: false
+          limit: 1
+        lag:
+          enabled: false
+
+  - name: "localhost ipv4 all"
+    filter: "outbound and loopback"
+
+  - name: "localhost ipv4 tcp"
+    filter: "tcp and outbound and loopback"
+
+  - name: "localhost ipv4 udp"
+    filter: "udp and outbound and loopback"
+
+  - name: "all sending packets"
+    filter: "outbound"
+
+  - name: "all receiving packets"
+    filter: "inbound"
+
+  - name: "all ipv4 against specific ip"
+    filter: "ip.DstAddr == 198.51.100.1 or ip.SrcAddr == 198.51.100.1"
+
+  - name: "tcp ipv4 against specific ip"
+    filter: "tcp and (ip.DstAddr == 198.51.100.1 or ip.SrcAddr == 198.51.100.1)"
+
+  - name: "udp ipv4 against specific ip"
+    filter: "udp and (ip.DstAddr == 198.51.100.1 or ip.SrcAddr == 198.51.100.1)"
+
+  - name: "all ipv4 against port"
+    filter: "tcp.DstPort == 12354 or tcp.SrcPort == 12354 or udp.DstPort == 12354 or udp.SrcPort == 12354"
+
+  - name: "tcp ipv4 against port"
+    filter: "tcp and (tcp.DstPort == 12354 or tcp.SrcPort == 12354)"
+
+  - name: "udp ipv4 against port"
+    filter: "udp and (udp.DstPort == 12354 or udp.SrcPort == 12354)"
+
+  - name: "ipv6 all"
+    filter: "ipv6"
