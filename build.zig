@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
     const ClumsyConf = enum { Debug, Release, Ship };
     const conf = b.option(ClumsyConf, "conf", "Debug, Release, Ship") orelse .Debug;
 
-    const optimize_mode, const subsystem = switch (conf) {
+    const optimize_mode, _ = switch (conf) {
         .Debug => .{ std.builtin.OptimizeMode.Debug, std.Target.SubSystem.Console },
         .Release => .{ std.builtin.OptimizeMode.ReleaseSafe, std.Target.SubSystem.Windows },
         .Ship => .{ std.builtin.OptimizeMode.ReleaseFast, std.Target.SubSystem.Windows },
@@ -50,7 +50,7 @@ pub fn build(b: *std.Build) void {
                 .link_libc = true,
             }),
         });
-        exe.subsystem = subsystem;
+        exe.subsystem = .Windows;
         exe.root_module.strip = (optimize_mode != .Debug);
         const m = exe.root_module;
 

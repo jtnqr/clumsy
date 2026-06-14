@@ -2,7 +2,7 @@
 #include <windows.h>
 #include "iup.h"
 
-// Creates and returns the Process Filter IUP Frame widget
+// Creates and returns the Process Filter and Session Timer horizontal box container
 Ihandle* uiCreateProcessFilterFrame(void);
 
 // Returns TRUE if the process filter toggle is checked (enabled)

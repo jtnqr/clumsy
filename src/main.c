@@ -10,6 +10,8 @@
 #include "process_filter.h"
 #include "ui_components.h"
 
+#define noticeLabel statusLabel
+
 // ! the order decides which module get processed first
 Module* modules[MODULE_CNT] = {
     &lagModule,
@@ -862,6 +864,8 @@ void init(int argc, char* argv[]) {
         "Filters like 'udp' need to be 'udp and outbound' to work. See readme for more info.");
     IupSetAttribute(statusLabel, "EXPAND", "HORIZONTAL");
     IupSetAttribute(statusLabel, "PADDING", "8x8");
+    IupSetAttribute(statusLabel, "FOREGROUND", "140 140 140");
+    IupSetAttribute(noticeLabel, "WORDWRAP", "YES");
 
     topFrame = IupFrame(
         topVbox = IupVbox(
@@ -870,6 +874,7 @@ void init(int argc, char* argv[]) {
                 stateIcon = IupLabel(NULL),
                 filterButton = IupButton("Start", NULL),
                 hotkeyLabel = IupLabel(""),
+                IupFill(),
                 IupLabel("Presets:  "),
                 filterSelectList = IupList(NULL),
                 NULL
@@ -989,30 +994,38 @@ void init(int argc, char* argv[]) {
     }
 
     // Process filter frame setup using the ui_components abstraction module
-    Ihandle *processFilterFrame = uiCreateProcessFilterFrame();
+    Ihandle *processFilterContainer = uiCreateProcessFilterFrame();
+
+    // Wrap the statusLabel inside an explicit vertical container
+    Ihandle *footerBox = IupVbox(statusLabel, NULL);
+    IupSetAttribute(footerBox, "MARGIN", "0x4");
+    IupSetAttribute(footerBox, "EXPAND", "HORIZONTAL");
 
     // dialog
     dialog = IupDialog(
         dialogVBox = IupVbox(
             topFrame,
-            processFilterFrame,
+            processFilterContainer,
             bottomFrame,
-            statusLabel,
+            footerBox,
             NULL
         )
     );
 
     IupSetAttribute(dialog, "TITLE", "clumsy " CLUMSY_VERSION);
     IupSetAttribute(dialog, "SIZE", "540x"); // add padding manually to width (extra space for hotkey label)
-    IupSetAttribute(dialog, "MINSIZE", "450x300");
     IupSetAttribute(dialog, "RESIZE", "YES");
     IupSetCallback(dialog, "SHOW_CB", (Icallback)uiOnDialogShow);
 
-
     // global layout settings to affect childrens
     IupSetAttribute(dialogVBox, "ALIGNMENT", "ACENTER");
-    IupSetAttribute(dialogVBox, "NCMARGIN", "4x4");
-    IupSetAttribute(dialogVBox, "NCGAP", "4x2");
+    IupSetAttribute(dialogVBox, "EXPAND", "HORIZONTAL");
+    IupSetAttribute(dialogVBox, "MARGIN", "4x4");
+    IupSetAttribute(dialogVBox, "GAP", "4");
+
+    IupMap(dialog);
+    IupRefresh(dialog);
+    IupSetAttribute(dialog, "MINSIZE", IupGetAttribute(dialog, "RASTERSIZE"));
 
     // setup timer
     timer = IupTimer();

@@ -10,20 +10,46 @@ static Ihandle *processFilterDurationText = NULL;
 static Ihandle *processFilterDurationToggle = NULL;
 
 Ihandle* uiCreateProcessFilterFrame(void) {
+    Ihandle *sessionTimerFrame;
+    Ihandle *processFilterHbox, *sessionTimerHbox, *masterHbox;
+
     processFilterFrame = IupFrame(
-        IupHbox(
+        processFilterHbox = IupHbox(
             processFilterLabel = IupLabel("Target Process:"),
             processFilterText = IupText(NULL),
-            processFilterToggle = IupToggle("Enable Process Filter", NULL),
-            processFilterDurationLabel = IupLabel("Duration (ms):"),
-            processFilterDurationText = IupText(NULL),
-            processFilterDurationToggle = IupToggle("Enable Timer", NULL),
+            processFilterToggle = IupToggle("Enable Process Filtering", NULL),
             NULL
         )
     );
     IupSetAttribute(processFilterFrame, "TITLE", "Process Filter");
-    IupSetAttribute(processFilterFrame, "EXPAND", "HORIZONTAL");
-    IupSetAttribute(processFilterText, "VISIBLECOLUMNS", "12");
+    IupSetAttribute(processFilterHbox, "ALIGNMENT", "ACENTER");
+    IupSetAttribute(processFilterHbox, "MARGIN", "6x6");
+    IupSetAttribute(processFilterHbox, "GAP", "6");
+
+    sessionTimerFrame = IupFrame(
+        sessionTimerHbox = IupHbox(
+            processFilterDurationLabel = IupLabel("Duration:"),
+            processFilterDurationText = IupText(NULL),
+            IupLabel("ms"),
+            processFilterDurationToggle = IupToggle("Enable Duration Limit", NULL),
+            NULL
+        )
+    );
+    IupSetAttribute(sessionTimerFrame, "TITLE", "Session Timer");
+    IupSetAttribute(sessionTimerHbox, "ALIGNMENT", "ACENTER");
+    IupSetAttribute(sessionTimerHbox, "MARGIN", "6x6");
+    IupSetAttribute(sessionTimerHbox, "GAP", "6");
+
+    masterHbox = IupHbox(
+        processFilterFrame,
+        IupFill(),
+        sessionTimerFrame,
+        NULL
+    );
+    IupSetAttribute(masterHbox, "EXPAND", "HORIZONTAL");
+    IupSetAttribute(masterHbox, "ALIGNMENT", "ACENTER");
+
+    IupSetAttribute(processFilterText, "VISIBLECOLUMNS", "10");
     IupSetAttribute(processFilterText, "VALUE", "");
     IupSetAttribute(processFilterToggle, "VALUE", "OFF");
     IupSetAttribute(processFilterDurationText, "VISIBLECOLUMNS", "5");
@@ -34,11 +60,6 @@ Ihandle* uiCreateProcessFilterFrame(void) {
     IupSetHandle("process_filter_toggle", processFilterToggle);
     IupSetHandle("process_filter_duration_text", processFilterDurationText);
     IupSetHandle("process_filter_duration_toggle", processFilterDurationToggle);
-
-    Ihandle *hbox = IupGetChild(processFilterFrame, 0);
-    IupSetAttribute(hbox, "ALIGNMENT", "ACENTER");
-    IupSetAttribute(hbox, "GAP", "8");
-    IupSetAttribute(hbox, "NCMARGIN", "4x4");
 
     // Restore from IupGlobal if loaded from state
     if (IupGetGlobal("process-filter-target")) {
@@ -64,7 +85,7 @@ Ihandle* uiCreateProcessFilterFrame(void) {
         }
     }
 
-    return processFilterFrame;
+    return masterHbox;
 }
 
 BOOL uiIsProcessFilterEnabled(void) {
