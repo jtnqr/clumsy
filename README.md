@@ -15,30 +15,37 @@ See [this page](http://jagt.github.io/clumsy) for more info and original build i
 
 ## Fork Enhancements
 
-This fork adds several UI/UX improvements:
+This fork adds several advanced UI/UX and feature improvements:
+
+### Dynamic Kernel-Level Process Filtering
+- Target specific applications by name (e.g., `discord.exe`, `chrome.exe`, `roblox`) instead of guessing static port ranges.
+- Intercepts connection mappings dynamically to match network sockets to running processes.
+- Automatically handles mid-session connections and cleanly releases resources on stop/close.
+
+### Session Timer (Duration Limit)
+- Restrict filtering sessions by configuring an execution duration in milliseconds.
+- Automatically stops network degradation when the timer expires.
 
 ### Global Hotkey Toggle
+- Configure a hotkey in `config.yaml` (e.g., `hotkey: f6` or `hotkey: ctrl+shift+c`).
+- Hotkey displayed next to the Start button.
+- Press the hotkey anytime to toggle filtering on/off.
 
-- Configure a hotkey in `config.txt` (e.g., `hotkey: f6` or `hotkey: ctrl+shift+c`)
-- Hotkey displayed next to the Start button
-- Press the hotkey anytime to toggle filtering on/off
+### State Persistence & Robust Configs
+- Config file upgraded to structured `config.yaml`.
+- Automatically generates a default, valid `config.yaml` if missing to prevent boot failures.
+- Filter text, target process, duration timer, and module settings are saved to `state.txt` on exit.
+- Restores active settings on launch (without auto-starting).
 
-### State Persistence
+### Visual Layout & Sizing Safeguards
+- Restructured layout with dedicated side-by-side frames for "Process Filter" and "Session Timer".
+- Programmatically enforces a minimum window size using computed natural dimensions (`RASTERSIZE`), preventing label clipping and text wrapping issues on any screen DPI.
+- Fully detached console subsystem for clean windowed execution.
 
-- Filter text and module settings are saved to `state.txt` on exit
-- Automatically restored on next launch (without auto-starting)
-
-### Improved UI Feedback
-
-- Window title shows "(running)" when filtering is active
-- Comprehensive tooltips on all modules and controls
-- WinDivert filter syntax reference in filter text tooltip
-
-### Packet Statistics
-
-- Per-module counter showing how many packets were affected
-- Counters update in real-time, persist after stopping for review
-- Reset when a new filtering session starts
+### Improved UI Feedback & Statistics
+- Window title shows `(running)` when filtering is active.
+- Real-time packet counters show exactly how many packets were affected per module.
+- Tooltips on all modules and controls, including a WinDivert filter syntax guide.
 
 ## Details
 
