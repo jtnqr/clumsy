@@ -162,7 +162,11 @@ void showStatus(const char* line);
 
 // WinDivert
 int divertStart(const char * filter, char buf[]);
-void divertStop();
+void divertStop(void);
+BOOL divertHotSwap(const char *newFilter);
+
+extern char g_manual_filter[4096];
+extern BOOL g_process_filter_enabled;
 
 // utils
 // STR to convert int macro to string

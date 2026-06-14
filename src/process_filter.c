@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "process_filter.h"
+#include "common.h"
+
+#define FILTER_BUFSIZE 2048
 
 #define FILTER_BUFSIZE 2048
 
@@ -14,6 +17,7 @@ static char g_target_process_name[MAX_PATH] = {0};
 static char g_final_filter_expr[FILTER_BUFSIZE] = {0};
 static HANDLE g_hStartEvent = NULL;
 static HANDLE g_hReadyEvent = NULL;
+static HANDLE g_hStopEvent = NULL;
 static HANDLE g_hWorkerThread = NULL;
 static volatile BOOL g_bShouldExit = FALSE;
 
@@ -145,9 +149,26 @@ static int getPortsForProcessSubstring(const char *processNameSub, USHORT *ports
     return portCount;
 }
 
+static int portsIdentical(USHORT *a, int countA, USHORT *b, int countB) {
+    if (countA != countB) return 0;
+    for (int i = 0; i < countA; i++) {
+        int found = 0;
+        for (int j = 0; j < countB; j++) {
+            if (a[i] == b[j]) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found) return 0;
+    }
+    return 1;
+}
+
 static DWORD WINAPI ProcessFilterWorkerThread(LPVOID lpParam) {
     UNREFERENCED_PARAMETER(lpParam);
     USHORT ports[1024];
+    USHORT last_ports[1024];
+    int last_port_count = 0;
 
     while (1) {
         WaitForSingleObject(g_hStartEvent, INFINITE);
@@ -156,10 +177,15 @@ static DWORD WINAPI ProcessFilterWorkerThread(LPVOID lpParam) {
             break;
         }
 
+        if (g_hStopEvent) {
+            ResetEvent(g_hStopEvent);
+        }
+
+        // Initial resolution
         int count = getPortsForProcessSubstring(g_target_process_name, ports, 1024);
 
+        g_final_filter_expr[0] = '\0';
         if (count > 0) {
-            g_final_filter_expr[0] = '\0';
             size_t current_len = 0;
             BOOL limit_reached = FALSE;
             for (int i = 0; i < count; i++) {
@@ -191,7 +217,88 @@ static DWORD WINAPI ProcessFilterWorkerThread(LPVOID lpParam) {
             snprintf(g_final_filter_expr, FILTER_BUFSIZE, "udp.DstPort == 0");
         }
 
+        // Save current ports as last ports
+        last_port_count = count;
+        if (count > 0) {
+            memcpy(last_ports, ports, count * sizeof(USHORT));
+        }
+
         SetEvent(g_hReadyEvent);
+
+        // Polling loop
+        while (!g_bShouldExit) {
+            DWORD waitRes = WaitForSingleObject(g_hStopEvent, 1000);
+            if (waitRes == WAIT_OBJECT_0) {
+                break;
+            }
+            if (g_bShouldExit) {
+                break;
+            }
+
+            USHORT current_ports[1024];
+            int current_count = getPortsForProcessSubstring(g_target_process_name, current_ports, 1024);
+
+            if (!portsIdentical(current_ports, current_count, last_ports, last_port_count)) {
+                LOG("Port variance detected! Resolving new filter expression...");
+
+                // Compile new process filter expression
+                char new_proc_expr[FILTER_BUFSIZE];
+                new_proc_expr[0] = '\0';
+                if (current_count > 0) {
+                    size_t current_len = 0;
+                    BOOL limit_reached = FALSE;
+                    for (int i = 0; i < current_count; i++) {
+                        if (i > 0) {
+                            if (current_len + 4 >= FILTER_BUFSIZE) {
+                                limit_reached = TRUE;
+                                break;
+                            }
+                            int written = snprintf(new_proc_expr + current_len, FILTER_BUFSIZE - current_len, " || ");
+                            if (written < 0 || (size_t)written >= FILTER_BUFSIZE - current_len) {
+                                limit_reached = TRUE;
+                                break;
+                            }
+                            current_len += written;
+                        }
+
+                        int written = snprintf(new_proc_expr + current_len, FILTER_BUFSIZE - current_len, "udp.DstPort == %u", current_ports[i]);
+                        if (written < 0 || (size_t)written >= FILTER_BUFSIZE - current_len) {
+                            limit_reached = TRUE;
+                            break;
+                        }
+                        current_len += written;
+                    }
+
+                    if (limit_reached) {
+                        snprintf(new_proc_expr, FILTER_BUFSIZE, "udp.DstPort == 0");
+                    }
+                } else {
+                    snprintf(new_proc_expr, FILTER_BUFSIZE, "udp.DstPort == 0");
+                }
+
+                // Copy to global expression buffer
+                strncpy(g_final_filter_expr, new_proc_expr, FILTER_BUFSIZE - 1);
+                g_final_filter_expr[FILTER_BUFSIZE - 1] = '\0';
+
+                // Combine with manual filter
+                extern char g_manual_filter[4096];
+                char combinedFilter[8192];
+                if (g_manual_filter[0] != '\0') {
+                    snprintf(combinedFilter, sizeof(combinedFilter), "(%s) && (%s)", g_manual_filter, new_proc_expr);
+                } else {
+                    snprintf(combinedFilter, sizeof(combinedFilter), "%s", new_proc_expr);
+                }
+
+                // Hot-swap WinDivert handle
+                divertHotSwap(combinedFilter);
+
+                // Update last ports
+                last_port_count = current_count;
+                if (current_count > 0) {
+                    memcpy(last_ports, current_ports, current_count * sizeof(USHORT));
+                }
+            }
+        }
     }
     return 0;
 }
@@ -200,17 +307,19 @@ void processFilterInit(void) {
     g_bShouldExit = FALSE;
     g_hStartEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
     g_hReadyEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+    g_hStopEvent = CreateEvent(NULL, TRUE, FALSE, NULL); // manual reset
     g_hWorkerThread = CreateThread(NULL, 0, ProcessFilterWorkerThread, NULL, 0, NULL);
 }
 
 void processFilterCleanup(void) {
+    g_bShouldExit = TRUE;
+    if (g_hStopEvent) {
+        SetEvent(g_hStopEvent);
+    }
+    if (g_hStartEvent) {
+        SetEvent(g_hStartEvent);
+    }
     if (g_hWorkerThread) {
-        g_bShouldExit = TRUE;
-        if (g_hStartEvent) {
-            SetEvent(g_hStartEvent); // Wake up the thread
-        }
-
-        // Wait gracefully for the thread to exit
         WaitForSingleObject(g_hWorkerThread, 1000);
         CloseHandle(g_hWorkerThread);
         g_hWorkerThread = NULL;
@@ -222,6 +331,16 @@ void processFilterCleanup(void) {
     if (g_hReadyEvent) {
         CloseHandle(g_hReadyEvent);
         g_hReadyEvent = NULL;
+    }
+    if (g_hStopEvent) {
+        CloseHandle(g_hStopEvent);
+        g_hStopEvent = NULL;
+    }
+}
+
+void processFilterStop(void) {
+    if (g_hStopEvent) {
+        SetEvent(g_hStopEvent);
     }
 }
 

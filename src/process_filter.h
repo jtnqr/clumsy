@@ -13,3 +13,6 @@ BOOL processFilterTrigger(const char *processNameSub);
 
 // Retrieve the dynamically generated WinDivert filter expression string
 const char* processFilterGetExpression(void);
+
+// Stop the background worker thread polling loop
+void processFilterStop(void);

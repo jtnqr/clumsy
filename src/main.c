@@ -23,6 +23,8 @@ Module* modules[MODULE_CNT] = {
 };
 
 volatile short sendState = SEND_STATUS_NONE;
+char g_manual_filter[4096] = {0};
+BOOL g_process_filter_enabled = FALSE;
 
 // global iup handlers
 static Ihandle *dialog, *topFrame, *bottomFrame; 
@@ -1191,10 +1193,55 @@ static int uiStartCb(Ihandle *ih) {
     const char *filterExpr;
     UNREFERENCED_PARAMETER(ih);
 
+    // 1. Duration input sanitization validation gate
+    int ms = 0;
+    if (uiIsDurationEnabled()) {
+        Ihandle *dur_text = IupGetHandle("process_filter_duration_text");
+        const char *rawDur = dur_text ? IupGetAttribute(dur_text, "VALUE") : NULL;
+        
+        BOOL valid = TRUE;
+        if (!rawDur || *rawDur == '\0') {
+            valid = FALSE;
+        } else {
+            const char *ptr = rawDur;
+            while (*ptr) {
+                if (*ptr < '0' || *ptr > '9') {
+                    valid = FALSE;
+                    break;
+                }
+                ptr++;
+            }
+        }
+        
+        if (valid) {
+            ms = atoi(rawDur);
+            if (ms <= 0) {
+                valid = FALSE;
+            }
+        }
+        
+        if (!valid) {
+            ms = 1000;
+            if (dur_text) {
+                IupSetAttribute(dur_text, "VALUE", "1000");
+            }
+            LOG("Duration input is invalid or 0. Coerced to 1000ms fallback.");
+        }
+    }
+
     const char *manualFilter = IupGetAttribute(filterText, "VALUE");
     static char combinedFilter[4096];
 
-    if (uiIsProcessFilterEnabled()) {
+    // Populate global filter coordination variables
+    if (manualFilter) {
+        strncpy(g_manual_filter, manualFilter, sizeof(g_manual_filter) - 1);
+        g_manual_filter[sizeof(g_manual_filter) - 1] = '\0';
+    } else {
+        g_manual_filter[0] = '\0';
+    }
+    g_process_filter_enabled = uiIsProcessFilterEnabled();
+
+    if (g_process_filter_enabled) {
         const char *procTarget = uiGetProcessFilterTarget();
         // Trigger process filter lookup
         if (processFilterTrigger(procTarget)) {
@@ -1238,7 +1285,6 @@ static int uiStartCb(Ihandle *ih) {
     IupSetAttribute(timer, "RUN", "YES");
 
     if (uiIsDurationEnabled()) {
-        int ms = uiGetDurationValue();
         if (ms > 0) {
             char timeBuf[32];
             snprintf(timeBuf, sizeof(timeBuf), "%d", ms);
@@ -1261,6 +1307,9 @@ static int uiStopCb(Ihandle *ih) {
     // try stopping
     IupSetAttribute(filterButton, "ACTIVE", "NO");
     IupFlush(); // flush to show disabled state
+    if (uiIsProcessFilterEnabled()) {
+        processFilterStop();
+    }
     divertStop();
 
     IupSetAttribute(dialog, "TITLE", "clumsy " CLUMSY_VERSION);

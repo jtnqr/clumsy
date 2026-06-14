@@ -13,6 +13,7 @@
 #define QUEUE_TIME 2 << 9 
 
 static HANDLE divertHandle;
+static volatile BOOL g_bHotSwapping = FALSE;
 static volatile short stopLooping;
 static HANDLE loopThread, clockThread, mutex;
 
@@ -336,6 +337,12 @@ static DWORD divertReadLoop(LPVOID arg) {
         }
         if (!WinDivertRecv(divertHandle, packetBuf, MAX_PACKETSIZE, &readLen, &addrBuf)) {
             DWORD lastError = GetLastError();
+            if (g_bHotSwapping) {
+                // Wait for hot-swap to complete
+                WaitForSingleObject(mutex, INFINITE);
+                ReleaseMutex(mutex);
+                continue;
+            }
             if (lastError == ERROR_INVALID_HANDLE || lastError == ERROR_OPERATION_ABORTED) {
                 // treat closing handle as quit
                 LOG("Handle died or operation aborted. Exit loop.");
@@ -409,4 +416,31 @@ void divertStop() {
     mutex = NULL;
 
     LOG("Successfully waited threads and stopped.");
+}
+
+BOOL divertHotSwap(const char *newFilter) {
+    BOOL ret = FALSE;
+    LOG("Initiating hot-swap to filter: %s", newFilter);
+    
+    if (WaitForSingleObject(mutex, INFINITE) == WAIT_OBJECT_0) {
+        g_bHotSwapping = TRUE;
+        
+        if (divertHandle && divertHandle != INVALID_HANDLE_VALUE) {
+            WinDivertClose(divertHandle);
+        }
+        
+        divertHandle = WinDivertOpen(newFilter, WINDIVERT_LAYER_NETWORK, DIVERT_PRIORITY, 0);
+        if (divertHandle != INVALID_HANDLE_VALUE) {
+            WinDivertSetParam(divertHandle, WINDIVERT_PARAM_QUEUE_LENGTH, QUEUE_LEN);
+            WinDivertSetParam(divertHandle, WINDIVERT_PARAM_QUEUE_TIME, QUEUE_TIME);
+            ret = TRUE;
+            LOG("Successfully hot-swapped WinDivert handle.");
+        } else {
+            LOG("Failed to open new WinDivert handle during hot-swap! Error: %lu", GetLastError());
+        }
+        
+        g_bHotSwapping = FALSE;
+        ReleaseMutex(mutex);
+    }
+    return ret;
 }
