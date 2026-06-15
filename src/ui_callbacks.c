@@ -384,9 +384,24 @@ static void uiSetModuleState(const char *shortName, BOOL enabled, BOOL inbound, 
     }
 }
 
+static void setAndSyncParam(Ihandle *ih, const char *field, const char *value) {
+    if (!ih) return;
+    IupSetAttribute(ih, field, value);
+    char *paramKey = IupGetAttribute(ih, PARAM_KEY);
+    if (paramKey) {
+        if (strcmp(value, "ON") == 0) {
+            IupStoreGlobal(paramKey, "on");
+        } else if (strcmp(value, "OFF") == 0) {
+            IupStoreGlobal(paramKey, "off");
+        } else {
+            IupStoreGlobal(paramKey, value);
+        }
+    }
+}
+
 void uiApplyProfile(ProfileRecord *p) {
     // 1. Set filter text
-    IupSetAttribute(filterText, "VALUE", p->filter);
+    setAndSyncParam(filterText, "VALUE", p->filter);
 
     // 2. Set process filter settings
     uiSetProcessFilterTarget(p->procFilterTarget);
@@ -462,7 +477,7 @@ void uiApplyProfile(ProfileRecord *p) {
         }
 
         // Apply enabled state
-        IupSetAttribute(toggle, "VALUE", enabled ? "ON" : "OFF");
+        setAndSyncParam(toggle, "VALUE", enabled ? "ON" : "OFF");
         IupSetAttribute(controls, "ACTIVE", enabled ? "YES" : "NO");
         short *enabledPtr = (short*)IupGetAttribute(toggle, SYNCED_VALUE);
         if (enabledPtr) {
@@ -473,12 +488,12 @@ void uiApplyProfile(ProfileRecord *p) {
         Ihandle *chk_inbound = (Ihandle*)IupGetAttribute(controls, "INBOUND_CHECKBOX");
         Ihandle *chk_outbound = (Ihandle*)IupGetAttribute(controls, "OUTBOUND_CHECKBOX");
         if (chk_inbound) {
-            IupSetAttribute(chk_inbound, "VALUE", inbound ? "ON" : "OFF");
+            setAndSyncParam(chk_inbound, "VALUE", inbound ? "ON" : "OFF");
             short *inboundPtr = (short*)IupGetAttribute(chk_inbound, SYNCED_VALUE);
             if (inboundPtr) InterlockedExchange16(inboundPtr, I2S(inbound ? 1 : 0));
         }
         if (chk_outbound) {
-            IupSetAttribute(chk_outbound, "VALUE", outbound ? "ON" : "OFF");
+            setAndSyncParam(chk_outbound, "VALUE", outbound ? "ON" : "OFF");
             short *outboundPtr = (short*)IupGetAttribute(chk_outbound, SYNCED_VALUE);
             if (outboundPtr) InterlockedExchange16(outboundPtr, I2S(outbound ? 1 : 0));
         }
@@ -489,7 +504,7 @@ void uiApplyProfile(ProfileRecord *p) {
                 strcmp(name, "ood") == 0 || strcmp(name, "tamper") == 0 || strcmp(name, "reset") == 0) {
                 Ihandle *chance_input = (Ihandle*)IupGetAttribute(controls, "CHANCE_INPUT");
                 if (chance_input) {
-                    IupSetAttribute(chance_input, "VALUE", val1);
+                    setAndSyncParam(chance_input, "VALUE", val1);
                     short *chancePtr = (short*)IupGetAttribute(chance_input, SYNCED_VALUE);
                     if (chancePtr) {
                         float fVal = (float)atof(val1);
@@ -499,7 +514,7 @@ void uiApplyProfile(ProfileRecord *p) {
             } else if (strcmp(name, "lag") == 0) {
                 Ihandle *time_input = (Ihandle*)IupGetAttribute(controls, "TIME_INPUT");
                 if (time_input) {
-                    IupSetAttribute(time_input, "VALUE", val1);
+                    setAndSyncParam(time_input, "VALUE", val1);
                     short *timePtr = (short*)IupGetAttribute(time_input, SYNCED_VALUE);
                     if (timePtr) {
                         int iVal = atoi(val1);
@@ -509,7 +524,7 @@ void uiApplyProfile(ProfileRecord *p) {
             } else if (strcmp(name, "bandwidth") == 0) {
                 Ihandle *bw_input = (Ihandle*)IupGetAttribute(controls, "BANDWIDTH_INPUT");
                 if (bw_input) {
-                    IupSetAttribute(bw_input, "VALUE", val1);
+                    setAndSyncParam(bw_input, "VALUE", val1);
                     LONG *bwPtr = (LONG*)IupGetAttribute(bw_input, SYNCED_VALUE);
                     if (bwPtr) {
                         int iVal = atoi(val1);
@@ -524,7 +539,7 @@ void uiApplyProfile(ProfileRecord *p) {
             if (val2) {
                 Ihandle *frame_input = (Ihandle*)IupGetAttribute(controls, "FRAME_INPUT");
                 if (frame_input) {
-                    IupSetAttribute(frame_input, "VALUE", val2);
+                    setAndSyncParam(frame_input, "VALUE", val2);
                     short *framePtr = (short*)IupGetAttribute(frame_input, SYNCED_VALUE);
                     if (framePtr) {
                         int iVal = atoi(val2);
@@ -534,7 +549,7 @@ void uiApplyProfile(ProfileRecord *p) {
             }
             Ihandle *drop_chk = (Ihandle*)IupGetAttribute(controls, "DROP_THROTTLED_CHECKBOX");
             if (drop_chk) {
-                IupSetAttribute(drop_chk, "VALUE", boolVal ? "ON" : "OFF");
+                setAndSyncParam(drop_chk, "VALUE", boolVal ? "ON" : "OFF");
                 short *dropPtr = (short*)IupGetAttribute(drop_chk, SYNCED_VALUE);
                 if (dropPtr) InterlockedExchange16(dropPtr, I2S(boolVal ? 1 : 0));
             }
@@ -542,7 +557,7 @@ void uiApplyProfile(ProfileRecord *p) {
             if (val2) {
                 Ihandle *count_input = (Ihandle*)IupGetAttribute(controls, "COUNT_INPUT");
                 if (count_input) {
-                    IupSetAttribute(count_input, "VALUE", val2);
+                    setAndSyncParam(count_input, "VALUE", val2);
                     short *countPtr = (short*)IupGetAttribute(count_input, SYNCED_VALUE);
                     if (countPtr) {
                         int iVal = atoi(val2);
@@ -553,7 +568,7 @@ void uiApplyProfile(ProfileRecord *p) {
         } else if (strcmp(name, "tamper") == 0) {
             Ihandle *checksum_chk = (Ihandle*)IupGetAttribute(controls, "CHECKSUM_CHECKBOX");
             if (checksum_chk) {
-                IupSetAttribute(checksum_chk, "VALUE", boolVal ? "ON" : "OFF");
+                setAndSyncParam(checksum_chk, "VALUE", boolVal ? "ON" : "OFF");
                 short *chkPtr = (short*)IupGetAttribute(checksum_chk, SYNCED_VALUE);
                 if (chkPtr) InterlockedExchange16(chkPtr, I2S(boolVal ? 1 : 0));
             }

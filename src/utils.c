@@ -4,7 +4,6 @@
 #include "common.h"
 
 // Custom attribute to store parameter key for state saving
-#define PARAM_KEY "__PARAM_KEY"
 
 short calcChance(short chance) {
     // notice that here we made a copy of chance, so even though it's volatile it is still ok

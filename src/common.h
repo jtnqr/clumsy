@@ -196,6 +196,7 @@ BOOL tryElevate(HWND hWnd, BOOL silent);
 extern const unsigned char icon8x8[8*8];
 
 // parameterized
+#define PARAM_KEY "__PARAM_KEY"
 extern BOOL parameterized;
 void setFromParameter(Ihandle *ih, const char *field, const char *key);
 BOOL parseArgs(int argc, char* argv[]);
