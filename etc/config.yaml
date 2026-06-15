@@ -1,3 +1,83 @@
+# ============================================================================
+# CLUMSY GLOBAL CONFIGURATION
+# ============================================================================
+# This file defines the core operational profiles (presets) for packet manipulation.
+#
+# Profile Schema:
+#   - name: "Profile Name"      # Display name of the preset
+#     filter: "WinDivert filter" # e.g. "inbound", "outbound and tcp", "udp"
+#     process_filter:            # (Optional) Target specific processes
+#       enabled: true/false
+#       target: "process_name"   # e.g., "roblox", "notepad"
+#       duration:                # (Optional) Duration controls
+#         enabled: true/false
+#         value_ms: 10
+#     modules:                   # (Optional) Interception modules
+#                                # Only active/enabled modules need to be specified.
+#
+# Module Reference & Examples:
+#
+#   1. lag: Delay packets by a specified time.
+#      lag:
+#        enabled: true
+#        inbound: true           # Intercept inbound packets
+#        outbound: true          # Intercept outbound packets
+#        time: 100               # Delay time in milliseconds (integer)
+#
+#   2. drop: Drop packets randomly.
+#      drop:
+#        enabled: true
+#        inbound: true
+#        outbound: true
+#        chance: 10.0            # Drop probability in % (float, 0.0 - 100.0)
+#
+#   3. throttle: Block traffic for a timeframe then send it.
+#      throttle:
+#        enabled: true
+#        inbound: true
+#        outbound: true
+#        chance: 20.0            # Throttle probability in %
+#        frame: 30               # Block duration window in ms
+#        drop: false             # Whether to drop throttled packets instead of sending
+#
+#   4. duplicate: Send copy of packets.
+#      duplicate:
+#        enabled: true
+#        inbound: true
+#        outbound: true
+#        chance: 15.0            # Duplication probability in %
+#        count: 2                # Number of duplicate packets to send (integer)
+#
+#   5. ood: Out of order (ood) packets delivery.
+#      ood:
+#        enabled: true
+#        inbound: true
+#        outbound: true
+#        chance: 10.0            # Probability of out-of-order delivery in %
+#
+#   6. tamper: Tamper packet checksum or payloads.
+#      tamper:
+#        enabled: true
+#        inbound: true
+#        outbound: true
+#        chance: 5.0             # Tampering probability in %
+#        checksum: true          # Recalculate checksum or break it (bool)
+#
+#   7. reset: Send TCP reset / ICMP unreachable packets.
+#      reset:
+#        enabled: true
+#        inbound: true
+#        outbound: true
+#        chance: 10.0            # Probability in %
+#
+#   8. bandwidth: Limit bandwidth rate.
+#      bandwidth:
+#        enabled: true
+#        inbound: true
+#        outbound: true
+#        limit: 10               # Bandwidth limit (e.g. KB/s)
+# ============================================================================
+
 hotkey: "f6"
 
 profiles:
@@ -20,8 +100,6 @@ profiles:
           inbound: true
           outbound: false
           limit: 1
-        lag:
-          enabled: false
 
   - name: "localhost ipv4 all"
     filter: "outbound and loopback"
