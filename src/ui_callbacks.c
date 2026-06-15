@@ -14,6 +14,8 @@
 
 #define noticeLabel statusLabel
 
+BOOL g_applying_preset = FALSE;
+
 // ui logics
 void showStatus(const char *line) {
     IupStoreAttribute(statusLabel, "TITLE", line); 
@@ -116,7 +118,9 @@ int uiOnDialogShow(Ihandle *ih, int state) {
     exit = tryElevate(hWnd, parameterized && !stateLoaded);
 
     if (!exit) {
+        g_applying_preset = TRUE;
         setFromParameter(filterText, "VALUE", "filter");
+        g_applying_preset = FALSE;
         if (parameterized && !stateLoaded) {
             LOG("is parameterized, start filtering upon execution.");
             uiStartCb(filterButton);
@@ -264,6 +268,7 @@ static int uiToggleControls(Ihandle *ih, int state) {
         IupSetAttribute(controls, "ACTIVE", "YES");
         InterlockedExchange16(target, I2S(state));
     }
+    uiMarkStateCustom();
 
     return IUP_DEFAULT;
 }
@@ -400,6 +405,8 @@ static void setAndSyncParam(Ihandle *ih, const char *field, const char *value) {
 }
 
 void uiApplyProfile(ProfileRecord *p) {
+    g_applying_preset = TRUE;
+
     // 1. Set filter text
     setAndSyncParam(filterText, "VALUE", p->filter);
 
@@ -574,23 +581,231 @@ void uiApplyProfile(ProfileRecord *p) {
             }
         }
     }
+    g_applying_preset = FALSE;
+}
+
+void uiActiveSettingsToProfile(ProfileRecord *p, const char *name) {
+    memset(p, 0, sizeof(ProfileRecord));
+    strncpy(p->name, name, sizeof(p->name)-1);
+    
+    const char *filt = IupGetAttribute(filterText, "VALUE");
+    strncpy(p->filter, filt ? filt : "", sizeof(p->filter)-1);
+    
+    p->procFilterEnabled = uiIsProcessFilterEnabled();
+    const char *procTgt = uiGetProcessFilterTarget();
+    strncpy(p->procFilterTarget, procTgt ? procTgt : "", sizeof(p->procFilterTarget)-1);
+    
+    p->durationEnabled = uiIsDurationEnabled();
+    p->durationValueMs = uiGetDurationValue();
+    
+    // Modules
+    // lag
+    Ihandle *lag_toggle = IupGetHandle("toggle_lag");
+    Ihandle *lag_controls = IupGetHandle("controls_lag");
+    p->lag.enabled = (IupGetInt(lag_toggle, "VALUE") == 1);
+    p->lag.inbound = (IupGetInt((Ihandle*)IupGetAttribute(lag_controls, "INBOUND_CHECKBOX"), "VALUE") == 1);
+    p->lag.outbound = (IupGetInt((Ihandle*)IupGetAttribute(lag_controls, "OUTBOUND_CHECKBOX"), "VALUE") == 1);
+    const char *lagTime = IupGetAttribute((Ihandle*)IupGetAttribute(lag_controls, "TIME_INPUT"), "VALUE");
+    strncpy(p->lag.time, lagTime ? lagTime : "50", sizeof(p->lag.time)-1);
+    
+    // drop
+    Ihandle *drop_toggle = IupGetHandle("toggle_drop");
+    Ihandle *drop_controls = IupGetHandle("controls_drop");
+    p->drop.enabled = (IupGetInt(drop_toggle, "VALUE") == 1);
+    p->drop.inbound = (IupGetInt((Ihandle*)IupGetAttribute(drop_controls, "INBOUND_CHECKBOX"), "VALUE") == 1);
+    p->drop.outbound = (IupGetInt((Ihandle*)IupGetAttribute(drop_controls, "OUTBOUND_CHECKBOX"), "VALUE") == 1);
+    const char *dropChance = IupGetAttribute((Ihandle*)IupGetAttribute(drop_controls, "CHANCE_INPUT"), "VALUE");
+    strncpy(p->drop.chance, dropChance ? dropChance : "10.0", sizeof(p->drop.chance)-1);
+    
+    // throttle
+    Ihandle *th_toggle = IupGetHandle("toggle_throttle");
+    Ihandle *th_controls = IupGetHandle("controls_throttle");
+    p->throttle.enabled = (IupGetInt(th_toggle, "VALUE") == 1);
+    p->throttle.inbound = (IupGetInt((Ihandle*)IupGetAttribute(th_controls, "INBOUND_CHECKBOX"), "VALUE") == 1);
+    p->throttle.outbound = (IupGetInt((Ihandle*)IupGetAttribute(th_controls, "OUTBOUND_CHECKBOX"), "VALUE") == 1);
+    const char *thChance = IupGetAttribute((Ihandle*)IupGetAttribute(th_controls, "CHANCE_INPUT"), "VALUE");
+    strncpy(p->throttle.chance, thChance ? thChance : "10.0", sizeof(p->throttle.chance)-1);
+    const char *thFrame = IupGetAttribute((Ihandle*)IupGetAttribute(th_controls, "FRAME_INPUT"), "VALUE");
+    strncpy(p->throttle.frame, thFrame ? thFrame : "30", sizeof(p->throttle.frame)-1);
+    p->throttle.drop = (IupGetInt((Ihandle*)IupGetAttribute(th_controls, "DROP_THROTTLED_CHECKBOX"), "VALUE") == 1);
+    
+    // duplicate
+    Ihandle *dup_toggle = IupGetHandle("toggle_duplicate");
+    Ihandle *dup_controls = IupGetHandle("controls_duplicate");
+    p->duplicate.enabled = (IupGetInt(dup_toggle, "VALUE") == 1);
+    p->duplicate.inbound = (IupGetInt((Ihandle*)IupGetAttribute(dup_controls, "INBOUND_CHECKBOX"), "VALUE") == 1);
+    p->duplicate.outbound = (IupGetInt((Ihandle*)IupGetAttribute(dup_controls, "OUTBOUND_CHECKBOX"), "VALUE") == 1);
+    const char *dupChance = IupGetAttribute((Ihandle*)IupGetAttribute(dup_controls, "CHANCE_INPUT"), "VALUE");
+    strncpy(p->duplicate.chance, dupChance ? dupChance : "10.0", sizeof(p->duplicate.chance)-1);
+    const char *dupCount = IupGetAttribute((Ihandle*)IupGetAttribute(dup_controls, "COUNT_INPUT"), "VALUE");
+    strncpy(p->duplicate.count, dupCount ? dupCount : "2", sizeof(p->duplicate.count)-1);
+    
+    // ood
+    Ihandle *ood_toggle = IupGetHandle("toggle_ood");
+    Ihandle *ood_controls = IupGetHandle("controls_ood");
+    p->ood.enabled = (IupGetInt(ood_toggle, "VALUE") == 1);
+    p->ood.inbound = (IupGetInt((Ihandle*)IupGetAttribute(ood_controls, "INBOUND_CHECKBOX"), "VALUE") == 1);
+    p->ood.outbound = (IupGetInt((Ihandle*)IupGetAttribute(ood_controls, "OUTBOUND_CHECKBOX"), "VALUE") == 1);
+    const char *oodChance = IupGetAttribute((Ihandle*)IupGetAttribute(ood_controls, "CHANCE_INPUT"), "VALUE");
+    strncpy(p->ood.chance, oodChance ? oodChance : "10.0", sizeof(p->ood.chance)-1);
+    
+    // tamper
+    Ihandle *tamper_toggle = IupGetHandle("toggle_tamper");
+    Ihandle *tamper_controls = IupGetHandle("controls_tamper");
+    p->tamper.enabled = (IupGetInt(tamper_toggle, "VALUE") == 1);
+    p->tamper.inbound = (IupGetInt((Ihandle*)IupGetAttribute(tamper_controls, "INBOUND_CHECKBOX"), "VALUE") == 1);
+    p->tamper.outbound = (IupGetInt((Ihandle*)IupGetAttribute(tamper_controls, "OUTBOUND_CHECKBOX"), "VALUE") == 1);
+    const char *tamperChance = IupGetAttribute((Ihandle*)IupGetAttribute(tamper_controls, "CHANCE_INPUT"), "VALUE");
+    strncpy(p->tamper.chance, tamperChance ? tamperChance : "10.0", sizeof(p->tamper.chance)-1);
+    p->tamper.checksum = (IupGetInt((Ihandle*)IupGetAttribute(tamper_controls, "CHECKSUM_CHECKBOX"), "VALUE") == 1);
+    
+    // reset
+    Ihandle *rst_toggle = IupGetHandle("toggle_reset");
+    Ihandle *rst_controls = IupGetHandle("controls_reset");
+    p->reset.enabled = (IupGetInt(rst_toggle, "VALUE") == 1);
+    p->reset.inbound = (IupGetInt((Ihandle*)IupGetAttribute(rst_controls, "INBOUND_CHECKBOX"), "VALUE") == 1);
+    p->reset.outbound = (IupGetInt((Ihandle*)IupGetAttribute(rst_controls, "OUTBOUND_CHECKBOX"), "VALUE") == 1);
+    const char *rstChance = IupGetAttribute((Ihandle*)IupGetAttribute(rst_controls, "CHANCE_INPUT"), "VALUE");
+    strncpy(p->reset.chance, rstChance ? rstChance : "0", sizeof(p->reset.chance)-1);
+    
+    // bandwidth
+    Ihandle *bw_toggle = IupGetHandle("toggle_bandwidth");
+    Ihandle *bw_controls = IupGetHandle("controls_bandwidth");
+    p->bandwidth.enabled = (IupGetInt(bw_toggle, "VALUE") == 1);
+    p->bandwidth.inbound = (IupGetInt((Ihandle*)IupGetAttribute(bw_controls, "INBOUND_CHECKBOX"), "VALUE") == 1);
+    p->bandwidth.outbound = (IupGetInt((Ihandle*)IupGetAttribute(bw_controls, "OUTBOUND_CHECKBOX"), "VALUE") == 1);
+    const char *bwLimit = IupGetAttribute((Ihandle*)IupGetAttribute(bw_controls, "BANDWIDTH_INPUT"), "VALUE");
+    strncpy(p->bandwidth.limit, bwLimit ? bwLimit : "10", sizeof(p->bandwidth.limit)-1);
+}
+
+void uiMarkStateCustom(void) {
+    if (!g_applying_preset) {
+        char valBuf[32];
+        snprintf(valBuf, sizeof(valBuf), "%d", filtersSize + 1);
+        IupSetAttribute(filterSelectList, "VALUE", valBuf); // Select "<custom>"
+    }
+}
+
+int uiProcessFilterChangeCb(Ihandle *ih) {
+    char *paramKey = IupGetAttribute(ih, PARAM_KEY);
+    if (paramKey) {
+        const char *val = IupGetAttribute(ih, "VALUE");
+        IupStoreGlobal(paramKey, val ? val : "");
+    }
+    uiMarkStateCustom();
+    return IUP_DEFAULT;
+}
+
+int uiProcessFilterToggleCb(Ihandle *ih, int state) {
+    char *paramKey = IupGetAttribute(ih, PARAM_KEY);
+    if (paramKey) {
+        IupStoreGlobal(paramKey, state ? "on" : "off");
+    }
+    uiMarkStateCustom();
+    return IUP_DEFAULT;
 }
 
 int uiListSelectCb(Ihandle *ih, char *text, int item, int state) {
     UNREFERENCED_PARAMETER(text);
     UNREFERENCED_PARAMETER(ih);
     if (state == 1) {
-        uiApplyProfile(&filters[item-1]);
+        if (item >= 1 && item <= (int)filtersSize) {
+            uiApplyProfile(&filters[item - 1]);
+        }
     }
     return IUP_DEFAULT;
 }
 
 int uiFilterTextCb(Ihandle *ih)  {
     UNREFERENCED_PARAMETER(ih);
-    // unselect list
-    IupSetAttribute(filterSelectList, "VALUE", "0");
+    uiMarkStateCustom();
     return IUP_DEFAULT;
 }
+
+void uiRefreshPresetsList(void) {
+    IupSetAttribute(filterSelectList, "REMOVEITEM", "ALL");
+    for (UINT i = 0; i < filtersSize; ++i) {
+        char ixBuf[32];
+        snprintf(ixBuf, sizeof(ixBuf), "%d", i + 1);
+        IupStoreAttribute(filterSelectList, ixBuf, filters[i].name);
+    }
+    char ixBuf[32];
+    snprintf(ixBuf, sizeof(ixBuf), "%d", filtersSize + 1);
+    IupStoreAttribute(filterSelectList, ixBuf, "<custom>");
+    
+    // Explicitly set the next index to NULL to ensure IUP truncates the list and prevents any trailing blank rows!
+    snprintf(ixBuf, sizeof(ixBuf), "%d", filtersSize + 2);
+    IupSetAttribute(filterSelectList, ixBuf, NULL);
+}
+
+int uiSavePresetCb(Ihandle *ih) {
+    char name[128] = "";
+    UNREFERENCED_PARAMETER(ih);
+
+    if (filtersSize >= CONFIG_MAX_RECORDS) {
+        IupMessage("Error", "Maximum number of presets reached!");
+        return IUP_DEFAULT;
+    }
+
+    int res = IupGetParam("Save Preset", NULL, NULL,
+        "Preset Name: %s{.120}\n",
+        name, NULL);
+
+    if (res && strlen(name) > 0) {
+        // Check for duplicate name
+        for (UINT i = 0; i < filtersSize; i++) {
+            if (strcmp(filters[i].name, name) == 0) {
+                IupMessage("Error", "A preset with this name already exists!");
+                return IUP_DEFAULT;
+            }
+        }
+
+        ProfileRecord *p = &filters[filtersSize];
+        uiActiveSettingsToProfile(p, name);
+        filtersSize++;
+        
+        saveConfig();
+        uiRefreshPresetsList();
+        
+        // Select newly created preset
+        char valBuf[32];
+        snprintf(valBuf, sizeof(valBuf), "%d", filtersSize);
+        IupSetAttribute(filterSelectList, "VALUE", valBuf);
+        LOG("Preset saved: %s", name);
+    }
+    return IUP_DEFAULT;
+}
+
+int uiDeletePresetCb(Ihandle *ih) {
+    UNREFERENCED_PARAMETER(ih);
+    int selected = IupGetInt(filterSelectList, "VALUE");
+    if (selected <= 0 || selected > (int)filtersSize) {
+        IupMessage("Notification", "Please select a user preset to delete.");
+        return IUP_DEFAULT;
+    }
+
+    int confirm = IupAlarm("Confirm Delete", "Are you sure you want to delete this preset?", "Yes", "No", NULL);
+    if (confirm == 1) {
+        int index = selected - 1;
+        LOG("Deleting preset: %s", filters[index].name);
+        
+        // Shift remaining profiles
+        for (UINT i = index; i < filtersSize - 1; i++) {
+            filters[i] = filters[i + 1];
+        }
+        filtersSize--;
+        
+        saveConfig();
+        uiRefreshPresetsList();
+        
+        char valBuf[32];
+        snprintf(valBuf, sizeof(valBuf), "%d", filtersSize + 1);
+        IupSetAttribute(filterSelectList, "VALUE", valBuf); // Select "<custom>" after delete
+    }
+    return IUP_DEFAULT;
+}
+
+
 
 void uiSetupModule(Module *module, Ihandle *parent) {
     Ihandle *groupBox, *toggle, *controls, *icon, *countLabel;

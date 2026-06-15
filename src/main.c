@@ -37,6 +37,7 @@ Ihandle *statusLabel;
 Ihandle *filterText, *filterButton;
 Ihandle *hotkeyLabel;
 Ihandle *filterSelectList;
+Ihandle *addPresetButton, *delPresetButton;
 // timer to update icons
 Ihandle *stateIcon;
 Ihandle *timer;
@@ -74,6 +75,8 @@ void init(int argc, char* argv[]) {
                 IupFill(),
                 IupLabel("Presets:  "),
                 filterSelectList = IupList(NULL),
+                addPresetButton = IupButton("Save", NULL),
+                delPresetButton = IupButton("Delete", NULL),
                 NULL
             ),
             NULL
@@ -138,26 +141,26 @@ void init(int argc, char* argv[]) {
     // fill in options and setup callback
     IupSetAttribute(filterSelectList, "VISIBLECOLUMNS", "24");
     IupSetAttribute(filterSelectList, "DROPDOWN", "YES");
-    for (ix = 0; ix < filtersSize; ++ix) {
-        char ixBuf[4];
-        snprintf(ixBuf, sizeof(ixBuf), "%d", ix+1); // ! staring from 1, following lua indexing
-        IupStoreAttribute(filterSelectList, ixBuf, filters[ix].name);
-    }
-    IupSetAttribute(filterSelectList, "VALUE", "1");
-    IupSetCallback(filterSelectList, "ACTION", (Icallback)uiListSelectCb);
+    uiRefreshPresetsList();
 
-    // Apply the first profile on startup if state was not loaded
-    if (filtersSize > 0 && !stateLoaded) {
-        uiApplyProfile(&filters[0]);
-    }
-    
-    // If state was loaded, restore the saved filter text and deselect preset
+    IupSetCallback(filterSelectList, "ACTION", (Icallback)uiListSelectCb);
+    IupSetCallback(addPresetButton, "ACTION", (Icallback)uiSavePresetCb);
+    IupSetAttribute(addPresetButton, "TIP", "Save current configuration as a preset");
+    IupSetAttribute(addPresetButton, "PADDING", "8x");
+
+    IupSetCallback(delPresetButton, "ACTION", (Icallback)uiDeletePresetCb);
+    IupSetAttribute(delPresetButton, "TIP", "Delete the selected preset");
+    IupSetAttribute(delPresetButton, "PADDING", "8x");
+
+    // set g_applying_preset = TRUE before loading parameters so sync callbacks are not triggered to mark custom
+    g_applying_preset = TRUE;
+
+    // If state was loaded, restore the saved filter text
     if (stateLoaded) {
         const char *savedFilter = IupGetGlobal("filter");
         LOG("Restoring filter from state: %s", savedFilter ? savedFilter : "(null)");
         if (savedFilter && strlen(savedFilter) > 0) {
             IupStoreAttribute(filterText, "VALUE", savedFilter);
-            IupSetAttribute(filterSelectList, "VALUE", "0");  // Deselect preset
         }
     }
 
@@ -192,6 +195,44 @@ void init(int argc, char* argv[]) {
 
     // Process filter frame setup using the ui_components abstraction module
     Ihandle *processFilterContainer = uiCreateProcessFilterFrame();
+
+    // Now we are done programmatically setting up the UI from loaded state or defaults,
+    // so we set g_applying_preset = FALSE.
+    g_applying_preset = FALSE;
+
+    // Determine what preset selection to show
+    if (stateLoaded) {
+        const char *savedPreset = IupGetGlobal("preset");
+        LOG("Restoring preset from state: %s", savedPreset ? savedPreset : "(null)");
+        int foundIdx = -1;
+        if (savedPreset && strcmp(savedPreset, "<custom>") != 0) {
+            for (ix = 0; ix < filtersSize; ++ix) {
+                if (strcmp(filters[ix].name, savedPreset) == 0) {
+                    foundIdx = ix;
+                    break;
+                }
+            }
+        }
+        if (foundIdx != -1) {
+            char valBuf[32];
+            snprintf(valBuf, sizeof(valBuf), "%d", foundIdx + 1);
+            IupSetAttribute(filterSelectList, "VALUE", valBuf);
+        } else {
+            char valBuf[32];
+            snprintf(valBuf, sizeof(valBuf), "%d", filtersSize + 1);
+            IupSetAttribute(filterSelectList, "VALUE", valBuf); // Select "<custom>"
+        }
+    } else {
+        // Apply the first profile on startup if state was not loaded
+        if (filtersSize > 0) {
+            uiApplyProfile(&filters[0]);
+            IupSetAttribute(filterSelectList, "VALUE", "1"); // Select first preset (index 1)
+        } else {
+            char valBuf[32];
+            snprintf(valBuf, sizeof(valBuf), "%d", filtersSize + 1);
+            IupSetAttribute(filterSelectList, "VALUE", valBuf); // Select "<custom>"
+        }
+    }
 
     // Wrap the statusLabel inside an explicit vertical container
     Ihandle *footerBox = IupVbox(statusLabel, NULL);

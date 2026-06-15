@@ -6,7 +6,7 @@
 #define CONFIG_FILE "config.yaml"
 #define STATE_FILE "state.txt"
 #define CONFIG_MAX_RECORDS 64
-#define CONFIG_BUF_SIZE 16384
+#define CONFIG_BUF_SIZE 131072
 
 typedef struct {
     char name[128];
@@ -80,10 +80,11 @@ typedef struct {
 
 extern UINT filtersSize;
 extern ProfileRecord filters[CONFIG_MAX_RECORDS];
-extern char configBuf[CONFIG_BUF_SIZE+2];
+
 extern BOOL parameterized;
 extern BOOL stateLoaded;
 
 void loadConfig(void);
+void saveConfig(void);
 void saveState(void);
 void loadState(void);

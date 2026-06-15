@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include "ui_components.h"
 #include "common.h"
+#include "ui_callbacks.h"
+
 
 static Ihandle *processFilterFrame = NULL;
 static Ihandle *processFilterToggle = NULL;
@@ -59,10 +61,21 @@ Ihandle* uiCreateProcessFilterFrame(void) {
     IupSetAttribute(processFilterDurationText, "VALUE", "10");
     IupSetAttribute(processFilterDurationToggle, "VALUE", "OFF");
 
+    IupSetAttribute(processFilterText, PARAM_KEY, "process-filter-target");
+    IupSetAttribute(processFilterToggle, PARAM_KEY, "process-filter-enabled");
+    IupSetAttribute(processFilterDurationText, PARAM_KEY, "process-filter-duration");
+    IupSetAttribute(processFilterDurationToggle, PARAM_KEY, "process-filter-duration-enabled");
+
+    IupSetCallback(processFilterText, "VALUECHANGED_CB", (Icallback)uiProcessFilterChangeCb);
+    IupSetCallback(processFilterToggle, "ACTION", (Icallback)uiProcessFilterToggleCb);
+    IupSetCallback(processFilterDurationText, "VALUECHANGED_CB", (Icallback)uiProcessFilterChangeCb);
+    IupSetCallback(processFilterDurationToggle, "ACTION", (Icallback)uiProcessFilterToggleCb);
+
     IupSetHandle("process_filter_text", processFilterText);
     IupSetHandle("process_filter_toggle", processFilterToggle);
     IupSetHandle("process_filter_duration_text", processFilterDurationText);
     IupSetHandle("process_filter_duration_toggle", processFilterDurationToggle);
+
 
     // Restore from IupGlobal if loaded from state
     if (IupGetGlobal("process-filter-target")) {

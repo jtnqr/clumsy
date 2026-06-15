@@ -198,5 +198,8 @@ extern const unsigned char icon8x8[8*8];
 // parameterized
 #define PARAM_KEY "__PARAM_KEY"
 extern BOOL parameterized;
+extern BOOL g_applying_preset;
+void uiMarkStateCustom(void);
 void setFromParameter(Ihandle *ih, const char *field, const char *key);
 BOOL parseArgs(int argc, char* argv[]);
+

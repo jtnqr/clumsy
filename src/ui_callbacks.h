@@ -24,3 +24,11 @@ int uiFilterTextCb(Ihandle *ih);
 void uiSetupModule(Module *module, Ihandle *parent);
 void toggleFiltering(void);
 void uiApplyProfile(ProfileRecord *p);
+void uiActiveSettingsToProfile(ProfileRecord *p, const char *name);
+void uiRefreshPresetsList(void);
+int uiSavePresetCb(Ihandle *ih);
+int uiDeletePresetCb(Ihandle *ih);
+int uiProcessFilterChangeCb(Ihandle *ih);
+int uiProcessFilterToggleCb(Ihandle *ih, int state);
+
+

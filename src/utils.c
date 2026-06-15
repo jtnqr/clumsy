@@ -52,6 +52,7 @@ int uiSyncChance(Ihandle *ih) {
         snprintf(valueBuf, sizeof(valueBuf), "%.1f", newValue);
         IupStoreGlobal(paramKey, valueBuf);
     }
+    uiMarkStateCustom();
     return IUP_DEFAULT;
 }
 
@@ -83,6 +84,7 @@ int uiSyncInt32(Ihandle *ih) {
         snprintf(valueBuf, sizeof(valueBuf), "%d", newValue);
         IupStoreGlobal(paramKey, valueBuf);
     }
+    uiMarkStateCustom();
     return IUP_DEFAULT;
 }
 
@@ -94,6 +96,7 @@ int uiSyncToggle(Ihandle *ih, int state) {
     if (paramKey) {
         IupStoreGlobal(paramKey, state ? "on" : "off");
     }
+    uiMarkStateCustom();
     return IUP_DEFAULT;
 }
 
@@ -124,6 +127,7 @@ int uiSyncInteger(Ihandle *ih) {
         snprintf(valueBuf, sizeof(valueBuf), "%d", newValue);
         IupStoreGlobal(paramKey, valueBuf);
     }
+    uiMarkStateCustom();
     return IUP_DEFAULT;
 }
 
@@ -151,6 +155,7 @@ int uiSyncFixed(Ihandle *ih) {
     // sync back
     fixValue = (short)(newValue / FIXED_EPSILON);
     InterlockedExchange16(fixedPointer, fixValue);
+    uiMarkStateCustom();
     return IUP_DEFAULT;
 }
 
