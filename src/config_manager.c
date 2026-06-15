@@ -581,6 +581,18 @@ void saveConfig(void) {
   fprintf(f, "# ============================================================================\n");
   fprintf(f, "# This file defines the core operational profiles (presets) for packet manipulation.\n");
   fprintf(f, "#\n");
+  fprintf(f, "# Global Interception Triggers:\n");
+  fprintf(f, "# \n");
+  fprintf(f, "#   hotkey: Define the global hotkey to start/stop packet filtering.\n");
+  fprintf(f, "#           Supported modifiers: ctrl, control, alt, shift, win\n");
+  fprintf(f, "#           Supported keys: f1-f12, a-z, 0-9\n");
+  fprintf(f, "#           Combinations are separated by '+'.\n");
+  fprintf(f, "#\n");
+  fprintf(f, "#           Examples: \"f6\", \"ctrl+f6\", \"ctrl+alt+a\", \"shift+win+s\"\n");
+  fprintf(f, "#\n\n");
+
+  fprintf(f, "hotkey: \"%s\"\n\n", hotkeyConfigStr);
+
   fprintf(f, "# Profile Schema:\n");
   fprintf(f, "#   - name: \"Profile Name\"      # Display name of the preset\n");
   fprintf(f, "#     filter: \"WinDivert filter\" # e.g. \"inbound\", \"outbound and tcp\", \"udp\"\n");
@@ -656,7 +668,6 @@ void saveConfig(void) {
   fprintf(f, "#        limit: 10               # Bandwidth limit (e.g. KB/s)\n");
   fprintf(f, "# ============================================================================\n\n");
 
-  fprintf(f, "hotkey: \"%s\"\n\n", hotkeyConfigStr);
   fprintf(f, "profiles:\n");
 
   for (UINT i = 0; i < filtersSize; ++i) {

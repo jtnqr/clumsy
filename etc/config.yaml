@@ -3,6 +3,19 @@
 # ============================================================================
 # This file defines the core operational profiles (presets) for packet manipulation.
 #
+
+# Global Interception Triggers:
+# 
+#   hotkey: Define the global hotkey to start/stop packet filtering.
+#           Supported modifiers: ctrl, control, alt, shift, win
+#           Supported keys: f1-f12, a-z, 0-9
+#           Combinations are separated by '+'.
+#
+#           Examples: "f6", "ctrl+f6", "ctrl+alt+a", "shift+win+s"
+#
+
+hotkey: "f6"
+
 # Profile Schema:
 #   - name: "Profile Name"      # Display name of the preset
 #     filter: "WinDivert filter" # e.g. "inbound", "outbound and tcp", "udp"
@@ -77,8 +90,6 @@
 #        outbound: true
 #        limit: 10               # Bandwidth limit (e.g. KB/s)
 # ============================================================================
-
-hotkey: "f6"
 
 profiles:
   - name: "roblox inbound"
