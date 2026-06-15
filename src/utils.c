@@ -41,7 +41,7 @@ int uiSyncChance(Ihandle *ih) {
        newValue = 0.0f;
     }
     if (newValue != value) { // equality compare is fine since newValue is a copy of value
-        sprintf(valueBuf, "%.1f", newValue);
+        snprintf(valueBuf, sizeof(valueBuf), "%.1f", newValue);
         IupStoreAttribute(ih, "VALUE", valueBuf);
         // put caret at end to enable editing while normalizing
         IupStoreAttribute(ih, "CARET", "10");
@@ -50,7 +50,7 @@ int uiSyncChance(Ihandle *ih) {
     InterlockedExchange16(chancePtr, (short)(newValue * 100));
     // Also update IupGlobal for state saving
     if (paramKey) {
-        sprintf(valueBuf, "%.1f", newValue);
+        snprintf(valueBuf, sizeof(valueBuf), "%.1f", newValue);
         IupStoreGlobal(paramKey, valueBuf);
     }
     return IUP_DEFAULT;
@@ -72,7 +72,7 @@ int uiSyncInt32(Ihandle *ih) {
     }
     // test for 0 as for empty input
     if (newValue != value && value != 0) {
-        sprintf(valueBuf, "%d", newValue);
+        snprintf(valueBuf, sizeof(valueBuf), "%d", newValue);
         IupStoreAttribute(ih, "VALUE", valueBuf);
         // put caret at end to enable editing while normalizing
         IupStoreAttribute(ih, "CARET", "10");
@@ -81,7 +81,7 @@ int uiSyncInt32(Ihandle *ih) {
     InterlockedExchange(integerPointer, newValue);
     // Also update IupGlobal for state saving
     if (paramKey) {
-        sprintf(valueBuf, "%d", newValue);
+        snprintf(valueBuf, sizeof(valueBuf), "%d", newValue);
         IupStoreGlobal(paramKey, valueBuf);
     }
     return IUP_DEFAULT;
@@ -113,7 +113,7 @@ int uiSyncInteger(Ihandle *ih) {
     }
     // test for 0 as for empty input
     if (newValue != value && value != 0) {
-        sprintf(valueBuf, "%d", newValue);
+        snprintf(valueBuf, sizeof(valueBuf), "%d", newValue);
         IupStoreAttribute(ih, "VALUE", valueBuf);
         // put caret at end to enable editing while normalizing
         IupStoreAttribute(ih, "CARET", "10");
@@ -122,7 +122,7 @@ int uiSyncInteger(Ihandle *ih) {
     InterlockedExchange16(integerPointer, (short)newValue);
     // Also update IupGlobal for state saving
     if (paramKey) {
-        sprintf(valueBuf, "%d", newValue);
+        snprintf(valueBuf, sizeof(valueBuf), "%d", newValue);
         IupStoreGlobal(paramKey, valueBuf);
     }
     return IUP_DEFAULT;
@@ -144,7 +144,7 @@ int uiSyncFixed(Ihandle *ih) {
     }
 
     if (newValue != value && value != 0) {
-        sprintf(valueBuf, "%.2f", newValue);
+        snprintf(valueBuf, sizeof(valueBuf), "%.2f", newValue);
         IupStoreAttribute(ih, "VALUE", valueBuf);
         // put caret at end to enable editing while normalizing
         IupStoreAttribute(ih, "CARET", "10");

@@ -178,7 +178,7 @@ int uiGetDurationValue(void) {
 void uiSetDurationValue(int durationMs) {
     if (processFilterDurationText) {
         char buf[32];
-        sprintf(buf, "%d", durationMs);
+        snprintf(buf, sizeof(buf), "%d", durationMs);
         IupStoreAttribute(processFilterDurationText, "VALUE", buf);
     }
 }

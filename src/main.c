@@ -140,7 +140,7 @@ void init(int argc, char* argv[]) {
     IupSetAttribute(filterSelectList, "DROPDOWN", "YES");
     for (ix = 0; ix < filtersSize; ++ix) {
         char ixBuf[4];
-        sprintf(ixBuf, "%d", ix+1); // ! staring from 1, following lua indexing
+        snprintf(ixBuf, sizeof(ixBuf), "%d", ix+1); // ! staring from 1, following lua indexing
         IupStoreAttribute(filterSelectList, ixBuf, filters[ix].name);
     }
     IupSetAttribute(filterSelectList, "VALUE", "1");
@@ -234,7 +234,7 @@ void init(int argc, char* argv[]) {
     if(arg_value != NULL)
     {
         char valueBuf[16];
-        sprintf(valueBuf, "%s000", arg_value);  // convert from seconds to milliseconds
+        snprintf(valueBuf, sizeof(valueBuf), "%s000", arg_value);  // convert from seconds to milliseconds
 
         timeout = IupTimer();
         IupStoreAttribute(timeout, "TIME", valueBuf);

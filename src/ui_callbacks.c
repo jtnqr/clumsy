@@ -84,7 +84,7 @@ int uiOnDialogShow(Ihandle *ih, int state) {
         // Update button tooltip to include the hotkey
         {
             char tipStr[128];
-            sprintf(tipStr, "Start/Stop packet filtering (Hotkey: %s)", hotkeyStr);
+            snprintf(tipStr, sizeof(tipStr), "Start/Stop packet filtering (Hotkey: %s)", hotkeyStr);
             IupStoreAttribute(filterButton, "TIP", tipStr);
         }
         
@@ -285,7 +285,7 @@ int uiTimerCb(Ihandle *ih) {
             char countBuf[16];
             LONG count = modules[ix]->processCount;
             if (count > 0) {
-                sprintf(countBuf, "%ld", count);
+                snprintf(countBuf, sizeof(countBuf), "%ld", count);
                 IupStoreAttribute(modules[ix]->countLabel, "TITLE", countBuf);
             }
         }
