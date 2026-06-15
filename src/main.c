@@ -44,11 +44,6 @@ Ihandle *timeout = NULL;
 Ihandle *durationTimer = NULL;
 
 
-// Parse hotkey configuration string like "ctrl+shift+c" or "alt+f10"
-
-
-
-
 void init(int argc, char* argv[]) {
     UINT ix;
     Ihandle *topVbox, *bottomVbox, *dialogVBox, *controlHbox;
