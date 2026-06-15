@@ -11,6 +11,7 @@ obj_gmake
 release.bat
 release/
 state.txt
+integration_test.ps1
 
 # Compiler & Editor Caches
 .zig-cache/
