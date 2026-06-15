@@ -28,9 +28,9 @@ hotkey: "f6"
 #     process_filter:            # (Optional) Target specific processes
 #       enabled: true/false      # Activate process filtering
 #       target: "process_name"   # e.g., "roblox", "notepad"
-#       duration:                # (Optional) Auto-stop timer controls
-#         enabled: true/false
-#         value_ms: 10
+#     duration:                  # (Optional) Auto-stop timer controls
+#       enabled: true/false
+#       value_ms: 10
 #     modules:                   # (Optional) Interception modules
 #                                # Only active/enabled modules need to be defined.
 #
@@ -123,20 +123,17 @@ profiles:
     process_filter:
       enabled: true
       target: "roblox"
-      duration:
-        enabled: false
-        value_ms: 10
-      modules:
-        drop:
-          enabled: true
-          inbound: true
-          outbound: false
-          chance: 100.0
-        bandwidth:
-          enabled: true
-          inbound: true
-          outbound: false
-          limit: 1
+    modules:
+      drop:
+        enabled: true
+        inbound: true
+        outbound: false
+        chance: 100.0
+      bandwidth:
+        enabled: true
+        inbound: true
+        outbound: false
+        limit: 1
 
   - name: "localhost ipv4 all"
     filter: "outbound and loopback"

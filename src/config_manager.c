@@ -119,17 +119,17 @@ static const char *default_yaml_template =
     "    process_filter:\n"
     "      enabled: true\n"
     "      target: \"roblox\"\n"
-    "      modules:\n"
-    "        drop:\n"
-    "          enabled: true\n"
-    "          inbound: true\n"
-    "          outbound: false\n"
-    "          chance: 100.0\n"
-    "        bandwidth:\n"
-    "          enabled: true\n"
-    "          inbound: true\n"
-    "          outbound: false\n"
-    "          limit: 1\n"
+    "    modules:\n"
+    "      drop:\n"
+    "        enabled: true\n"
+    "        inbound: true\n"
+    "        outbound: false\n"
+    "        chance: 100.0\n"
+    "      bandwidth:\n"
+    "        enabled: true\n"
+    "        inbound: true\n"
+    "        outbound: false\n"
+    "        limit: 1\n"
     "\n"
     "  - name: \"localhost ipv4 all\"\n"
     "    filter: \"outbound and loopback\"\n"
@@ -897,100 +897,100 @@ void saveConfig(void) {
                        pr->reset.enabled || pr->bandwidth.enabled;
 
     if (has_modules) {
-      fprintf(f, "      modules:\n");
+      fprintf(f, "    modules:\n");
 
       // lag
       if (pr->lag.enabled) {
-        fprintf(f, "        lag:\n");
-        fprintf(f, "          enabled: true\n");
-        fprintf(f, "          inbound: %s\n",
+        fprintf(f, "      lag:\n");
+        fprintf(f, "        enabled: true\n");
+        fprintf(f, "        inbound: %s\n",
                 pr->lag.inbound ? "true" : "false");
-        fprintf(f, "          outbound: %s\n",
+        fprintf(f, "        outbound: %s\n",
                 pr->lag.outbound ? "true" : "false");
-        fprintf(f, "          time: %s\n", pr->lag.time);
+        fprintf(f, "        time: %s\n", pr->lag.time);
       }
 
       // drop
       if (pr->drop.enabled) {
-        fprintf(f, "        drop:\n");
-        fprintf(f, "          enabled: true\n");
-        fprintf(f, "          inbound: %s\n",
+        fprintf(f, "      drop:\n");
+        fprintf(f, "        enabled: true\n");
+        fprintf(f, "        inbound: %s\n",
                 pr->drop.inbound ? "true" : "false");
-        fprintf(f, "          outbound: %s\n",
+        fprintf(f, "        outbound: %s\n",
                 pr->drop.outbound ? "true" : "false");
-        fprintf(f, "          chance: %s\n", pr->drop.chance);
+        fprintf(f, "        chance: %s\n", pr->drop.chance);
       }
 
       // throttle
       if (pr->throttle.enabled) {
-        fprintf(f, "        throttle:\n");
-        fprintf(f, "          enabled: true\n");
-        fprintf(f, "          inbound: %s\n",
+        fprintf(f, "      throttle:\n");
+        fprintf(f, "        enabled: true\n");
+        fprintf(f, "        inbound: %s\n",
                 pr->throttle.inbound ? "true" : "false");
-        fprintf(f, "          outbound: %s\n",
+        fprintf(f, "        outbound: %s\n",
                 pr->throttle.outbound ? "true" : "false");
-        fprintf(f, "          chance: %s\n", pr->throttle.chance);
-        fprintf(f, "          frame: %s\n", pr->throttle.frame);
-        fprintf(f, "          drop: %s\n",
+        fprintf(f, "        chance: %s\n", pr->throttle.chance);
+        fprintf(f, "        frame: %s\n", pr->throttle.frame);
+        fprintf(f, "        drop: %s\n",
                 pr->throttle.drop ? "true" : "false");
       }
 
       // duplicate
       if (pr->duplicate.enabled) {
-        fprintf(f, "        duplicate:\n");
-        fprintf(f, "          enabled: true\n");
-        fprintf(f, "          inbound: %s\n",
+        fprintf(f, "      duplicate:\n");
+        fprintf(f, "        enabled: true\n");
+        fprintf(f, "        inbound: %s\n",
                 pr->duplicate.inbound ? "true" : "false");
-        fprintf(f, "          outbound: %s\n",
+        fprintf(f, "        outbound: %s\n",
                 pr->duplicate.outbound ? "true" : "false");
-        fprintf(f, "          chance: %s\n", pr->duplicate.chance);
-        fprintf(f, "          count: %s\n", pr->duplicate.count);
+        fprintf(f, "        chance: %s\n", pr->duplicate.chance);
+        fprintf(f, "        count: %s\n", pr->duplicate.count);
       }
 
       // ood
       if (pr->ood.enabled) {
-        fprintf(f, "        ood:\n");
-        fprintf(f, "          enabled: true\n");
-        fprintf(f, "          inbound: %s\n",
+        fprintf(f, "      ood:\n");
+        fprintf(f, "        enabled: true\n");
+        fprintf(f, "        inbound: %s\n",
                 pr->ood.inbound ? "true" : "false");
-        fprintf(f, "          outbound: %s\n",
+        fprintf(f, "        outbound: %s\n",
                 pr->ood.outbound ? "true" : "false");
-        fprintf(f, "          chance: %s\n", pr->ood.chance);
+        fprintf(f, "        chance: %s\n", pr->ood.chance);
       }
 
       // tamper
       if (pr->tamper.enabled) {
-        fprintf(f, "        tamper:\n");
-        fprintf(f, "          enabled: true\n");
-        fprintf(f, "          inbound: %s\n",
+        fprintf(f, "      tamper:\n");
+        fprintf(f, "        enabled: true\n");
+        fprintf(f, "        inbound: %s\n",
                 pr->tamper.inbound ? "true" : "false");
-        fprintf(f, "          outbound: %s\n",
+        fprintf(f, "        outbound: %s\n",
                 pr->tamper.outbound ? "true" : "false");
-        fprintf(f, "          chance: %s\n", pr->tamper.chance);
-        fprintf(f, "          checksum: %s\n",
+        fprintf(f, "        chance: %s\n", pr->tamper.chance);
+        fprintf(f, "        checksum: %s\n",
                 pr->tamper.checksum ? "true" : "false");
       }
 
       // reset
       if (pr->reset.enabled) {
-        fprintf(f, "        reset:\n");
-        fprintf(f, "          enabled: true\n");
-        fprintf(f, "          inbound: %s\n",
+        fprintf(f, "      reset:\n");
+        fprintf(f, "        enabled: true\n");
+        fprintf(f, "        inbound: %s\n",
                 pr->reset.inbound ? "true" : "false");
-        fprintf(f, "          outbound: %s\n",
+        fprintf(f, "        outbound: %s\n",
                 pr->reset.outbound ? "true" : "false");
-        fprintf(f, "          chance: %s\n", pr->reset.chance);
+        fprintf(f, "        chance: %s\n", pr->reset.chance);
       }
 
       // bandwidth
       if (pr->bandwidth.enabled) {
-        fprintf(f, "        bandwidth:\n");
-        fprintf(f, "          enabled: true\n");
-        fprintf(f, "          inbound: %s\n",
+        fprintf(f, "      bandwidth:\n");
+        fprintf(f, "        enabled: true\n");
+        fprintf(f, "        inbound: %s\n",
                 pr->bandwidth.inbound ? "true" : "false");
-        fprintf(f, "          outbound: %s\n",
+        fprintf(f, "        outbound: %s\n",
                 pr->bandwidth.outbound ? "true" : "false");
-        fprintf(f, "          limit: %s\n", pr->bandwidth.limit);
+        fprintf(f, "        limit: %s\n", pr->bandwidth.limit);
       }
     }
 
