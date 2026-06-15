@@ -31,17 +31,15 @@ static const char *default_yaml_template =
     "#\n"
     "# Profile Schema:\n"
     "#   - name: \"Profile Name\"      # Display name of the preset\n"
-    "#     filter: \"WinDivert filter\" # e.g. \"inbound\", \"outbound and "
-    "tcp\", \"udp\"\n"
+    "#     filter: \"WinDivert filter\" # e.g. \"inbound\", \"outbound and tcp\", \"udp\"\n"
     "#     process_filter:            # (Optional) Target specific processes\n"
-    "#       enabled: true/false\n"
+    "#       enabled: true/false      # Activate process filtering\n"
     "#       target: \"process_name\"   # e.g., \"roblox\", \"notepad\"\n"
-    "#       duration:                # (Optional) Duration controls\n"
-    "#         enabled: true/false\n"
-    "#         value_ms: 10\n"
+    "#     duration:                  # (Optional) Auto-stop timer controls\n"
+    "#       enabled: true/false\n"
+    "#       value_ms: 10\n"
     "#     modules:                   # (Optional) Interception modules\n"
-    "#                                # Only active/enabled modules need to be "
-    "specified.\n"
+    "#                                # Only active/enabled modules need to be specified.\n"
     "#\n"
     "# Module Reference & Examples:\n"
     "#\n"
@@ -121,9 +119,6 @@ static const char *default_yaml_template =
     "    process_filter:\n"
     "      enabled: true\n"
     "      target: \"roblox\"\n"
-    "      duration:\n"
-    "        enabled: false\n"
-    "        value_ms: 10\n"
     "      modules:\n"
     "        drop:\n"
     "          enabled: true\n"
@@ -691,22 +686,23 @@ void loadConfig() {
                     strncpy(p->bandwidth.limit, value,
                             sizeof(p->bandwidth.limit) - 1);
                 }
+              } else if (under_duration) {
+                BOOL val_bool =
+                    (strcmp(value, "true") == 0 || strcmp(value, "on") == 0 ||
+                     strcmp(value, "1") == 0);
+                if (strcmp(key, "enabled") == 0)
+                  p->durationEnabled = val_bool;
+                else if (strcmp(key, "value_ms") == 0)
+                  p->durationValueMs = atoi(value);
               } else if (under_proc_filter) {
                 BOOL val_bool =
                     (strcmp(value, "true") == 0 || strcmp(value, "on") == 0 ||
                      strcmp(value, "1") == 0);
-                if (under_duration) {
-                  if (strcmp(key, "enabled") == 0)
-                    p->durationEnabled = val_bool;
-                  else if (strcmp(key, "value_ms") == 0)
-                    p->durationValueMs = atoi(value);
-                } else {
-                  if (strcmp(key, "enabled") == 0)
-                    p->procFilterEnabled = val_bool;
-                  else if (strcmp(key, "target") == 0)
-                    strncpy(p->procFilterTarget, value,
-                            sizeof(p->procFilterTarget) - 1);
-                }
+                if (strcmp(key, "enabled") == 0)
+                  p->procFilterEnabled = val_bool;
+                else if (strcmp(key, "target") == 0)
+                  strncpy(p->procFilterTarget, value,
+                          sizeof(p->procFilterTarget) - 1);
               } else {
                 if (strcmp(key, "filter") == 0) {
                   strncpy(p->filter, value, sizeof(p->filter) - 1);
@@ -787,9 +783,9 @@ void saveConfig(void) {
   fprintf(f, "#     process_filter:            # (Optional) Target specific processes\n");
   fprintf(f, "#       enabled: true/false      # Activate process filtering\n");
   fprintf(f, "#       target: \"process_name\"   # e.g., \"roblox\", \"notepad\"\n");
-  fprintf(f, "#       duration:                # (Optional) Auto-stop timer controls\n");
-  fprintf(f, "#         enabled: true/false\n");
-  fprintf(f, "#         value_ms: 10\n");
+  fprintf(f, "#     duration:                  # (Optional) Auto-stop timer controls\n");
+  fprintf(f, "#       enabled: true/false\n");
+  fprintf(f, "#       value_ms: 10\n");
   fprintf(f, "#     modules:                   # (Optional) Interception modules\n");
   fprintf(f, "#                                # Only active/enabled modules need to be defined.\n");
   fprintf(f, "#\n");
@@ -883,18 +879,16 @@ void saveConfig(void) {
     fprintf(f, "  - name: \"%s\"\n", pr->name);
     fprintf(f, "    filter: \"%s\"\n", pr->filter);
 
-    if (pr->procFilterEnabled || pr->procFilterTarget[0] != '\0' ||
-        pr->durationEnabled) {
+    if (pr->procFilterEnabled || pr->procFilterTarget[0] != '\0') {
       fprintf(f, "    process_filter:\n");
-      fprintf(f, "      enabled: %s\n",
-              pr->procFilterEnabled ? "true" : "false");
+      fprintf(f, "      enabled: %s\n", pr->procFilterEnabled ? "true" : "false");
       fprintf(f, "      target: \"%s\"\n", pr->procFilterTarget);
-      if (pr->durationEnabled || pr->durationValueMs != 10) {
-        fprintf(f, "      duration:\n");
-        fprintf(f, "        enabled: %s\n",
-                pr->durationEnabled ? "true" : "false");
-        fprintf(f, "        value_ms: %d\n", pr->durationValueMs);
-      }
+    }
+
+    if (pr->durationEnabled) {
+      fprintf(f, "    duration:\n");
+      fprintf(f, "      enabled: true\n");
+      fprintf(f, "      value_ms: %d\n", pr->durationValueMs);
     }
 
     BOOL has_modules = pr->lag.enabled || pr->drop.enabled ||
