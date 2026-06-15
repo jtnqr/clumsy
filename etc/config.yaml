@@ -1,4 +1,121 @@
+# ============================================================================
+# CLUMSY GLOBAL CONFIGURATION
+# ============================================================================
+# This file defines the operational profiles (presets) for packet manipulation.
+#
+
+# ----------------------------------------------------------------------------
+# 1. Global Interception Triggers
+# ----------------------------------------------------------------------------
+# hotkey: Define the global hotkey to start/stop packet filtering.
+#         - Modifiers: ctrl, control, alt, shift, win
+#         - Keys:      f1-f12, a-z, 0-9
+#         - Format:    Modifiers and keys are combined using '+' (case-insensitive).
+#
+#         Examples: "f6", "ctrl+f6", "ctrl+alt+a", "shift+win+s"
+
 hotkey: "f6"
+
+# ----------------------------------------------------------------------------
+# 2. Preset Schema Reference & Examples
+# ----------------------------------------------------------------------------
+# Each profile dictates the filtering rules, target processes, execution
+# durations, and active interceptor modules.
+#
+# Profile Schema:
+#   - name: "Profile Name"      # Display name of the preset
+#     filter: "WinDivert filter" # e.g. "inbound", "outbound and tcp", "udp"
+#     process_filter:            # (Optional) Target specific processes
+#       enabled: true/false      # Activate process filtering
+#       target: "process_name"   # e.g., "roblox", "notepad"
+#     duration:                  # (Optional) Auto-stop timer controls
+#       enabled: true/false
+#       value_ms: 10
+#     modules:                   # (Optional) Interception modules
+#                                # Only active/enabled modules need to be defined.
+#
+# Module Options:
+#
+#   lag: Delay packets by a specified time.
+#     - time:     Delay time in milliseconds (integer)
+#     Example:
+#       lag:
+#         enabled: true
+#         inbound: true          # Intercept inbound packets
+#         outbound: true         # Intercept outbound packets
+#         time: 100
+#
+#   drop: Drop packets randomly.
+#     - chance:   Drop probability in % (float, 0.0 - 100.0)
+#     Example:
+#       drop:
+#         enabled: true
+#         inbound: true
+#         outbound: true
+#         chance: 10.0
+#
+#   throttle: Block traffic for a timeframe then send it in a burst.
+#     - chance:   Throttle probability in % (float, 0.0 - 100.0)
+#     - frame:    Block duration window in ms (integer)
+#     - drop:     Whether to drop throttled packets instead of sending (bool)
+#     Example:
+#       throttle:
+#         enabled: true
+#         inbound: true
+#         outbound: true
+#         chance: 20.0
+#         frame: 30
+#         drop: false
+#
+#   duplicate: Send copy of packets.
+#     - chance:   Duplication probability in % (float, 0.0 - 100.0)
+#     - count:    Number of duplicate packets to send (integer)
+#     Example:
+#       duplicate:
+#         enabled: true
+#         inbound: true
+#         outbound: true
+#         chance: 15.0
+#         count: 2
+#
+#   ood: Deliver packets out of order (ood).
+#     - chance:   Probability of out-of-order delivery in % (float, 0.0 - 100.0)
+#     Example:
+#       ood:
+#         enabled: true
+#         inbound: true
+#         outbound: true
+#         chance: 10.0
+#
+#   tamper: Tamper packet checksums or payloads.
+#     - chance:   Tampering probability in % (float, 0.0 - 100.0)
+#     - checksum: Recalculate checksums or leave them broken (bool)
+#     Example:
+#       tamper:
+#         enabled: true
+#         inbound: true
+#         outbound: true
+#         chance: 5.0
+#         checksum: true
+#
+#   reset: Send TCP reset / ICMP unreachable packets.
+#     - chance:   probability in % (float, 0.0 - 100.0)
+#     Example:
+#       reset:
+#         enabled: true
+#         inbound: true
+#         outbound: true
+#         chance: 10.0
+#
+#   bandwidth: Limit packet transfer rates.
+#     - limit:    Bandwidth limit (integer, e.g. KB/s)
+#     Example:
+#       bandwidth:
+#         enabled: true
+#         inbound: true
+#         outbound: true
+#         limit: 10
+# ============================================================================
 
 profiles:
   - name: "roblox inbound"
@@ -6,22 +123,17 @@ profiles:
     process_filter:
       enabled: true
       target: "roblox"
-      duration:
-        enabled: false
-        value_ms: 10
-      modules:
-        drop:
-          enabled: true
-          inbound: true
-          outbound: false
-          chance: 100.0
-        bandwidth:
-          enabled: true
-          inbound: true
-          outbound: false
-          limit: 1
-        lag:
-          enabled: false
+    modules:
+      drop:
+        enabled: true
+        inbound: true
+        outbound: false
+        chance: 100.0
+      bandwidth:
+        enabled: true
+        inbound: true
+        outbound: false
+        limit: 1
 
   - name: "localhost ipv4 all"
     filter: "outbound and loopback"

@@ -57,10 +57,12 @@ pub fn build(b: *std.Build) void {
         // Add C source files
         const c_sources = [_][]const u8{
             "src/bandwidth.c",
+            "src/config_manager.c",
             "src/divert.c",
             "src/drop.c",
             "src/duplicate.c",
             "src/elevate.c",
+            "src/hotkey_manager.c",
             "src/lag.c",
             "src/main.c",
             "src/ood.c",
@@ -69,6 +71,7 @@ pub fn build(b: *std.Build) void {
             "src/reset.c",
             "src/tamper.c",
             "src/throttle.c",
+            "src/ui_callbacks.c",
             "src/ui_components.c",
             "src/utils.c",
         };

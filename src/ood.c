@@ -41,11 +41,9 @@ static Ihandle *oodSetupUI() {
     IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
     IupSetAttribute(chanceInput, "TIP", "Probability of reordering (0-100%)");
 
-    if (parameterized) {
-        setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
-        setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
-        setFromParameter(chanceInput, "VALUE", NAME"-chance");
-    }
+    setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
+    setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
+    setFromParameter(chanceInput, "VALUE", NAME"-chance");
 
     IupSetAttribute(oodControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
     IupSetAttribute(oodControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);

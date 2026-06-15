@@ -85,9 +85,9 @@ int divertStart(const char *filter, char buf[]) {
     if (divertHandle == INVALID_HANDLE_VALUE) {
         DWORD lastError = GetLastError();
         if (lastError == ERROR_INVALID_PARAMETER) {
-            strcpy(buf, "Failed to start filtering : filter syntax error.");
+            snprintf(buf, MSG_BUFSIZE, "Failed to start filtering : filter syntax error.");
         } else {
-            sprintf(buf, "Failed to start filtering : failed to open device (code:%lu).\n"
+            snprintf(buf, MSG_BUFSIZE, "Failed to start filtering : failed to open device (code:%lu).\n"
                 "Make sure you run clumsy as Administrator.", lastError);
         }
         return FALSE;
@@ -111,18 +111,18 @@ int divertStart(const char *filter, char buf[]) {
     stopLooping = FALSE;
     mutex = CreateMutex(NULL, FALSE, NULL);
     if (mutex == NULL) {
-        sprintf(buf, "Failed to create mutex (%lu)", GetLastError());
+        snprintf(buf, MSG_BUFSIZE, "Failed to create mutex (%lu)", GetLastError());
         return FALSE;
     }
 
     loopThread = CreateThread(NULL, 1, (LPTHREAD_START_ROUTINE)divertReadLoop, NULL, 0, NULL);
     if (loopThread == NULL) {
-        sprintf(buf, "Failed to create recv loop thread (%lu)", GetLastError());
+        snprintf(buf, MSG_BUFSIZE, "Failed to create recv loop thread (%lu)", GetLastError());
         return FALSE;
     }
     clockThread = CreateThread(NULL, 1, (LPTHREAD_START_ROUTINE)divertClockLoop, NULL, 0, NULL);
     if (clockThread == NULL) {
-        sprintf(buf, "Failed to create clock loop thread (%lu)", GetLastError());
+        snprintf(buf, MSG_BUFSIZE, "Failed to create clock loop thread (%lu)", GetLastError());
         return FALSE;
     }
 

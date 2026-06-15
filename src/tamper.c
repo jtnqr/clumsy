@@ -45,12 +45,10 @@ static Ihandle* tamperSetupUI() {
     IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
     IupSetAttribute(chanceInput, "TIP", "Probability of tampering (0-100%)");
 
-    if (parameterized) {
-        setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
-        setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
-        setFromParameter(chanceInput, "VALUE", NAME"-chance");
-        setFromParameter(checksumCheckbox, "VALUE", NAME"-checksum");
-    }
+    setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
+    setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
+    setFromParameter(chanceInput, "VALUE", NAME"-chance");
+    setFromParameter(checksumCheckbox, "VALUE", NAME"-checksum");
 
     IupSetAttribute(dupControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
     IupSetAttribute(dupControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);

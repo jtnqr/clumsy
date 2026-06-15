@@ -51,12 +51,10 @@ static Ihandle* dupSetupUI() {
     IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
     IupSetAttribute(chanceInput, "TIP", "Probability of duplicating (0-100%)");
 
-    if (parameterized) {
-        setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
-        setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
-        setFromParameter(chanceInput, "VALUE", NAME"-chance");
-        setFromParameter(countInput, "VALUE", NAME"-count");
-    }
+    setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
+    setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
+    setFromParameter(chanceInput, "VALUE", NAME"-chance");
+    setFromParameter(countInput, "VALUE", NAME"-count");
 
     IupSetAttribute(dupControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
     IupSetAttribute(dupControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
