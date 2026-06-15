@@ -11,3 +11,12 @@ obj_gmake
 release.bat
 release/
 state.txt
+
+# Compiler & Editor Caches
+.zig-cache/
+.vscode/
+.rtk/
+.clangd
+skills-lock.json
+.agents/
+
