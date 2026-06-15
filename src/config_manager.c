@@ -544,14 +544,85 @@ void saveConfig(void) {
     return;
   }
 
-  fprintf(f, "# "
-             "================================================================="
-             "===========\n");
-  fprintf(f, "# CLUMSY VERSION %s GLOBAL CONFIGURATION (AUTO-GENERATED)\n",
-          CLUMSY_VERSION);
-  fprintf(f, "# "
-             "================================================================="
-             "===========\n\n");
+  fprintf(f, "# ============================================================================\n");
+  fprintf(f, "# CLUMSY VERSION %s GLOBAL CONFIGURATION (AUTO-GENERATED)\n", CLUMSY_VERSION);
+  fprintf(f, "# ============================================================================\n");
+  fprintf(f, "# This file defines the core operational profiles (presets) for packet manipulation.\n");
+  fprintf(f, "#\n");
+  fprintf(f, "# Profile Schema:\n");
+  fprintf(f, "#   - name: \"Profile Name\"      # Display name of the preset\n");
+  fprintf(f, "#     filter: \"WinDivert filter\" # e.g. \"inbound\", \"outbound and tcp\", \"udp\"\n");
+  fprintf(f, "#     process_filter:            # (Optional) Target specific processes\n");
+  fprintf(f, "#       enabled: true/false\n");
+  fprintf(f, "#       target: \"process_name\"   # e.g., \"roblox\", \"notepad\"\n");
+  fprintf(f, "#       duration:                # (Optional) Duration controls\n");
+  fprintf(f, "#         enabled: true/false\n");
+  fprintf(f, "#         value_ms: 10\n");
+  fprintf(f, "#     modules:                   # (Optional) Interception modules\n");
+  fprintf(f, "#                                # Only active/enabled modules need to be specified.\n");
+  fprintf(f, "#\n");
+  fprintf(f, "# Module Reference & Examples:\n");
+  fprintf(f, "#\n");
+  fprintf(f, "#   1. lag: Delay packets by a specified time.\n");
+  fprintf(f, "#      lag:\n");
+  fprintf(f, "#        enabled: true\n");
+  fprintf(f, "#        inbound: true           # Intercept inbound packets\n");
+  fprintf(f, "#        outbound: true          # Intercept outbound packets\n");
+  fprintf(f, "#        time: 100               # Delay time in milliseconds (integer)\n");
+  fprintf(f, "#\n");
+  fprintf(f, "#   2. drop: Drop packets randomly.\n");
+  fprintf(f, "#      drop:\n");
+  fprintf(f, "#        enabled: true\n");
+  fprintf(f, "#        inbound: true\n");
+  fprintf(f, "#        outbound: true\n");
+  fprintf(f, "#        chance: 10.0            # Drop probability in %% (float, 0.0 - 100.0)\n");
+  fprintf(f, "#\n");
+  fprintf(f, "#   3. throttle: Block traffic for a timeframe then send it.\n");
+  fprintf(f, "#      throttle:\n");
+  fprintf(f, "#        enabled: true\n");
+  fprintf(f, "#        inbound: true\n");
+  fprintf(f, "#        outbound: true\n");
+  fprintf(f, "#        chance: 20.0            # Throttle probability in %%\n");
+  fprintf(f, "#        frame: 30               # Block duration window in ms\n");
+  fprintf(f, "#        drop: false             # Whether to drop throttled packets instead of sending\n");
+  fprintf(f, "#\n");
+  fprintf(f, "#   4. duplicate: Send copy of packets.\n");
+  fprintf(f, "#      duplicate:\n");
+  fprintf(f, "#        enabled: true\n");
+  fprintf(f, "#        inbound: true\n");
+  fprintf(f, "#        outbound: true\n");
+  fprintf(f, "#        chance: 15.0            # Duplication probability in %%\n");
+  fprintf(f, "#        count: 2                # Number of duplicate packets to send (integer)\n");
+  fprintf(f, "#\n");
+  fprintf(f, "#   5. ood: Out of order (ood) packets delivery.\n");
+  fprintf(f, "#      ood:\n");
+  fprintf(f, "#        enabled: true\n");
+  fprintf(f, "#        inbound: true\n");
+  fprintf(f, "#        outbound: true\n");
+  fprintf(f, "#        chance: 10.0            # Probability of out-of-order delivery in %%\n");
+  fprintf(f, "#\n");
+  fprintf(f, "#   6. tamper: Tamper packet checksum or payloads.\n");
+  fprintf(f, "#      tamper:\n");
+  fprintf(f, "#        enabled: true\n");
+  fprintf(f, "#        inbound: true\n");
+  fprintf(f, "#        outbound: true\n");
+  fprintf(f, "#        chance: 5.0             # Tampering probability in %%\n");
+  fprintf(f, "#        checksum: true          # Recalculate checksum or break it (bool)\n");
+  fprintf(f, "#\n");
+  fprintf(f, "#   7. reset: Send TCP reset / ICMP unreachable packets.\n");
+  fprintf(f, "#      reset:\n");
+  fprintf(f, "#        enabled: true\n");
+  fprintf(f, "#        inbound: true\n");
+  fprintf(f, "#        outbound: true\n");
+  fprintf(f, "#        chance: 10.0            # Probability in %%\n");
+  fprintf(f, "#\n");
+  fprintf(f, "#   8. bandwidth: Limit bandwidth rate.\n");
+  fprintf(f, "#      bandwidth:\n");
+  fprintf(f, "#        enabled: true\n");
+  fprintf(f, "#        inbound: true\n");
+  fprintf(f, "#        outbound: true\n");
+  fprintf(f, "#        limit: 10               # Bandwidth limit (e.g. KB/s)\n");
+  fprintf(f, "# ============================================================================\n\n");
 
   fprintf(f, "hotkey: \"%s\"\n\n", hotkeyConfigStr);
   fprintf(f, "profiles:\n");
