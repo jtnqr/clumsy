@@ -56,11 +56,9 @@ static Ihandle *lagSetupUI() {
     IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
     IupSetAttribute(timeInput, "TIP", "Delay time in milliseconds (0-15000)");
 
-    if (parameterized) {
-        setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
-        setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
-        setFromParameter(timeInput, "VALUE", NAME"-time");
-    }
+    setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
+    setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
+    setFromParameter(timeInput, "VALUE", NAME"-time");
 
     IupSetAttribute(lagControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
     IupSetAttribute(lagControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);

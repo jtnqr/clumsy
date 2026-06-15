@@ -115,13 +115,12 @@ int uiOnDialogShow(Ihandle *ih, int state) {
     // Only be silent if this is actual command-line parameterized mode, not state restore
     exit = tryElevate(hWnd, parameterized && !stateLoaded);
 
-    if (!exit && parameterized) {
+    if (!exit) {
         setFromParameter(filterText, "VALUE", "filter");
-        // Only auto-start if this is command-line parameterized, NOT state restore
-        if (!stateLoaded) {
+        if (parameterized && !stateLoaded) {
             LOG("is parameterized, start filtering upon execution.");
             uiStartCb(filterButton);
-        } else {
+        } else if (parameterized && stateLoaded) {
             LOG("State restored, NOT auto-starting (safety)");
         }
     }
@@ -644,8 +643,5 @@ void uiSetupModule(Module *module, Ihandle *parent) {
     IupSetAttribute(countLabel, "TIP", "Packets affected by this module during current/last session. Resets when filtering starts.");
     module->countLabel = countLabel;
 
-    // parameterize toggle
-    if (parameterized) {
-        setFromParameter(toggle, "VALUE", module->shortName);
-    }
+    setFromParameter(toggle, "VALUE", module->shortName);
 }

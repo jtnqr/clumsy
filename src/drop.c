@@ -39,11 +39,9 @@ static Ihandle* dropSetupUI() {
     IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
     IupSetAttribute(chanceInput, "TIP", "Probability of dropping (0-100%)");
 
-    if (parameterized) {
-        setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
-        setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
-        setFromParameter(chanceInput, "VALUE", NAME"-chance");
-    }
+    setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
+    setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
+    setFromParameter(chanceInput, "VALUE", NAME"-chance");
 
     IupSetAttribute(dropControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
     IupSetAttribute(dropControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);

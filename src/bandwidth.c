@@ -81,11 +81,9 @@ static Ihandle* bandwidthSetupUI() {
     IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
     IupSetAttribute(bandwidthInput, "TIP", "Maximum bandwidth in kilobytes per second");
 
-    if (parameterized) {
-        setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
-        setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
-        setFromParameter(bandwidthInput, "VALUE", NAME"-bandwidth");
-    }
+    setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
+    setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
+    setFromParameter(bandwidthInput, "VALUE", NAME"-bandwidth");
 
     IupSetAttribute(bandwidthControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
     IupSetAttribute(bandwidthControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);

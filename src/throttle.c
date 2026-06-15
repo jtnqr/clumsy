@@ -71,12 +71,10 @@ static Ihandle *throttleSetupUI() {
     IupSetAttribute(outboundCheckbox, "TIP", "Apply to outgoing packets");
     IupSetAttribute(chanceInput, "TIP", "Probability of triggering throttle (0-100%)");
 
-    if (parameterized) {
-        setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
-        setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
-        setFromParameter(chanceInput, "VALUE", NAME"-chance");
-        setFromParameter(frameInput, "VALUE", NAME"-frame");
-    }
+    setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
+    setFromParameter(outboundCheckbox, "VALUE", NAME"-outbound");
+    setFromParameter(chanceInput, "VALUE", NAME"-chance");
+    setFromParameter(frameInput, "VALUE", NAME"-frame");
 
     IupSetAttribute(throttleControlsBox, "INBOUND_CHECKBOX", (char*)inboundCheckbox);
     IupSetAttribute(throttleControlsBox, "OUTBOUND_CHECKBOX", (char*)outboundCheckbox);
