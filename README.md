@@ -31,9 +31,12 @@ This fork adds several advanced UI/UX and feature improvements:
 - Hotkey displayed next to the Start button.
 - Press the hotkey anytime to toggle filtering on/off.
 
-### State Persistence & Robust Configs
+### State Persistence, Presets & Configs
 - Config file upgraded to structured `config.yaml`.
 - Automatically generates a default, valid `config.yaml` if missing to prevent boot failures.
+- **Preset management**: Save custom configurations or delete existing ones directly from the UI.
+- **Dynamic `<custom>` selection**: Automatically switches the dropdown selection to `<custom>` when settings are tweaked.
+- **Legacy migration**: Automatically parses and upgrades old `config.txt` configurations to `config.yaml` on startup.
 - Filter text, target process, duration timer, and module settings are saved to `state.txt` on exit.
 - Restores active settings on launch (without auto-starting).
 
