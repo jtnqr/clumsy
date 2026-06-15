@@ -138,37 +138,7 @@ int uiStartCb(Ihandle *ih) {
     // 1. Duration input sanitization validation gate
     int ms = 0;
     if (uiIsDurationEnabled()) {
-        Ihandle *dur_text = IupGetHandle("process_filter_duration_text");
-        const char *rawDur = dur_text ? IupGetAttribute(dur_text, "VALUE") : NULL;
-        
-        BOOL valid = TRUE;
-        if (!rawDur || *rawDur == '\0') {
-            valid = FALSE;
-        } else {
-            const char *ptr = rawDur;
-            while (*ptr) {
-                if (*ptr < '0' || *ptr > '9') {
-                    valid = FALSE;
-                    break;
-                }
-                ptr++;
-            }
-        }
-        
-        if (valid) {
-            ms = atoi(rawDur);
-            if (ms <= 0) {
-                valid = FALSE;
-            }
-        }
-        
-        if (!valid) {
-            ms = 1000;
-            if (dur_text) {
-                IupSetAttribute(dur_text, "VALUE", "1000");
-            }
-            LOG("Duration input is invalid or 0. Coerced to 1000ms fallback.");
-        }
+        ms = uiGetDurationValue();
     }
 
     const char *manualFilter = IupGetAttribute(filterText, "VALUE");
@@ -420,23 +390,10 @@ void uiApplyProfile(ProfileRecord *p) {
     IupSetAttribute(filterText, "VALUE", p->filter);
 
     // 2. Set process filter settings
-    Ihandle *proc_text = IupGetHandle("process_filter_text");
-    Ihandle *proc_toggle = IupGetHandle("process_filter_toggle");
-    Ihandle *dur_text = IupGetHandle("process_filter_duration_text");
-    Ihandle *dur_toggle = IupGetHandle("process_filter_duration_toggle");
-
-    if (proc_text) IupSetAttribute(proc_text, "VALUE", p->procFilterTarget);
-    if (proc_toggle) {
-        IupSetAttribute(proc_toggle, "VALUE", p->procFilterEnabled ? "ON" : "OFF");
-    }
-    if (dur_text) {
-        char durBuf[32];
-        snprintf(durBuf, sizeof(durBuf), "%d", p->durationValueMs);
-        IupSetAttribute(dur_text, "VALUE", durBuf);
-    }
-    if (dur_toggle) {
-        IupSetAttribute(dur_toggle, "VALUE", p->durationEnabled ? "ON" : "OFF");
-    }
+    uiSetProcessFilterTarget(p->procFilterTarget);
+    uiSetProcessFilterEnabled(p->procFilterEnabled);
+    uiSetDurationValue(p->durationValueMs);
+    uiSetDurationEnabled(p->durationEnabled);
 
     // 3. Set modules
     for (int i = 0; i < MODULE_CNT; i++) {

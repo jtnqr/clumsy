@@ -1,5 +1,8 @@
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include "ui_components.h"
+#include "common.h"
 
 static Ihandle *processFilterFrame = NULL;
 static Ihandle *processFilterToggle = NULL;
@@ -93,10 +96,22 @@ BOOL uiIsProcessFilterEnabled(void) {
     return IupGetInt(processFilterToggle, "VALUE");
 }
 
+void uiSetProcessFilterEnabled(BOOL enabled) {
+    if (processFilterToggle) {
+        IupSetAttribute(processFilterToggle, "VALUE", enabled ? "ON" : "OFF");
+    }
+}
+
 const char* uiGetProcessFilterTarget(void) {
     if (!processFilterText) return "";
     const char *val = IupGetAttribute(processFilterText, "VALUE");
     return val ? val : "";
+}
+
+void uiSetProcessFilterTarget(const char *target) {
+    if (processFilterText) {
+        IupSetAttribute(processFilterText, "VALUE", target ? target : "");
+    }
 }
 
 void uiSetProcessFilterActive(BOOL active) {
@@ -119,8 +134,51 @@ BOOL uiIsDurationEnabled(void) {
     return IupGetInt(processFilterDurationToggle, "VALUE");
 }
 
+void uiSetDurationEnabled(BOOL enabled) {
+    if (processFilterDurationToggle) {
+        IupSetAttribute(processFilterDurationToggle, "VALUE", enabled ? "ON" : "OFF");
+    }
+}
+
 int uiGetDurationValue(void) {
     if (!processFilterDurationText) return 0;
-    int val = IupGetInt(processFilterDurationText, "VALUE");
-    return val > 0 ? val : 0;
+    const char *rawDur = IupGetAttribute(processFilterDurationText, "VALUE");
+    
+    BOOL valid = TRUE;
+    if (!rawDur || *rawDur == '\0') {
+        valid = FALSE;
+    } else {
+        const char *ptr = rawDur;
+        while (*ptr) {
+            if (*ptr < '0' || *ptr > '9') {
+                valid = FALSE;
+                break;
+            }
+            ptr++;
+        }
+    }
+    
+    int ms = 0;
+    if (valid) {
+        ms = atoi(rawDur);
+        if (ms <= 0) {
+            valid = FALSE;
+        }
+    }
+    
+    if (!valid) {
+        ms = 1000;
+        IupSetAttribute(processFilterDurationText, "VALUE", "1000");
+        LOG("Duration input is invalid or 0. Coerced to 1000ms fallback.");
+    }
+    
+    return ms;
+}
+
+void uiSetDurationValue(int durationMs) {
+    if (processFilterDurationText) {
+        char buf[32];
+        sprintf(buf, "%d", durationMs);
+        IupStoreAttribute(processFilterDurationText, "VALUE", buf);
+    }
 }
