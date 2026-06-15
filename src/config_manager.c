@@ -175,6 +175,165 @@ static const char *default_yaml_template =
     "  - name: \"ipv6 all\"\n"
     "    filter: \"ipv6\"\n";
 
+static BOOL tryMigrateConfigTxt(const char *yamlPath) {
+  char txtPath[MSG_BUFSIZE];
+  char bakPath[MSG_BUFSIZE];
+  FILE *txtFile;
+  char *p;
+  
+  // Construct config.txt and config.txt.bak paths
+  strncpy(txtPath, yamlPath, sizeof(txtPath) - 1);
+  txtPath[sizeof(txtPath) - 1] = '\0';
+  p = strrchr(txtPath, '.');
+  if (p && (strcmp(p, ".yaml") == 0 || strcmp(p, ".yml") == 0)) {
+    strcpy(p, ".txt");
+  } else {
+    return FALSE;
+  }
+  
+  strncpy(bakPath, txtPath, sizeof(bakPath) - 1);
+  bakPath[sizeof(bakPath) - 1] = '\0';
+  strncat(bakPath, ".bak", sizeof(bakPath) - strlen(bakPath) - 1);
+  
+  txtFile = fopen(txtPath, "r");
+  if (!txtFile) {
+    return FALSE; // config.txt does not exist
+  }
+  
+  LOG("Found legacy config.txt at %s, migrating to YAML...", txtPath);
+  
+  filtersSize = 0;
+  char line[2048];
+  while (fgets(line, sizeof(line), txtFile)) {
+    // Trim leading spaces
+    char *ptr = line;
+    while (*ptr == ' ' || *ptr == '\t' || *ptr == '\r' || *ptr == '\n') ptr++;
+    
+    // Skip comment/empty lines
+    if (*ptr == '\0' || *ptr == '#') continue;
+    
+    // Trim trailing newlines and carriage returns
+    char *end = ptr + strlen(ptr) - 1;
+    while (end > ptr && (*end == '\r' || *end == '\n' || *end == ' ' || *end == '\t')) {
+      *end = '\0';
+      end--;
+    }
+    
+    if (strncmp(ptr, "hotkey:", 7) == 0) {
+      char *hk = ptr + 7;
+      while (*hk == ' ' || *hk == '\t' || *hk == '"' || *hk == '\'') hk++;
+      char *hk_end = hk + strlen(hk) - 1;
+      while (hk_end > hk && (*hk_end == ' ' || *hk_end == '\t' || *hk_end == '"' || *hk_end == '\'')) {
+        *hk_end = '\0';
+        hk_end--;
+      }
+      if (strlen(hk) > 0) {
+        strncpy(hotkeyConfigStr, hk, sizeof(hotkeyConfigStr) - 1);
+        hotkeyConfigStr[sizeof(hotkeyConfigStr) - 1] = '\0';
+        LOG("Migrated hotkey: %s", hotkeyConfigStr);
+      }
+    } else {
+      char *colon = strchr(ptr, ':');
+      if (colon) {
+        *colon = '\0';
+        char *name = ptr;
+        char *filter = colon + 1;
+        
+        // Trim name
+        while (*name == ' ' || *name == '\t') name++;
+        char *n_end = name + strlen(name) - 1;
+        while (n_end > name && (*n_end == ' ' || *n_end == '\t')) {
+          *n_end = '\0';
+          n_end--;
+        }
+        
+        // Trim filter
+        while (*filter == ' ' || *filter == '\t') filter++;
+        char *f_end = filter + strlen(filter) - 1;
+        while (f_end > filter && (*f_end == ' ' || *f_end == '\t')) {
+          *f_end = '\0';
+          f_end--;
+        }
+        
+        if (strlen(name) > 0 && strlen(filter) > 0 && filtersSize < CONFIG_MAX_RECORDS) {
+          ProfileRecord *pr = &filters[filtersSize];
+          memset(pr, 0, sizeof(ProfileRecord));
+          
+          // Set default initialized values
+          pr->procFilterEnabled = FALSE;
+          pr->procFilterTarget[0] = '\0';
+          pr->durationEnabled = FALSE;
+          pr->durationValueMs = 10;
+          
+          pr->lag.enabled = FALSE;
+          pr->lag.inbound = TRUE;
+          pr->lag.outbound = TRUE;
+          strcpy(pr->lag.time, "50");
+          
+          pr->drop.enabled = FALSE;
+          pr->drop.inbound = TRUE;
+          pr->drop.outbound = TRUE;
+          strcpy(pr->drop.chance, "10.0");
+          
+          pr->throttle.enabled = FALSE;
+          pr->throttle.inbound = TRUE;
+          pr->throttle.outbound = TRUE;
+          strcpy(pr->throttle.chance, "10.0");
+          strcpy(pr->throttle.frame, "30");
+          pr->throttle.drop = FALSE;
+          
+          pr->duplicate.enabled = FALSE;
+          pr->duplicate.inbound = TRUE;
+          pr->duplicate.outbound = TRUE;
+          strcpy(pr->duplicate.chance, "10.0");
+          strcpy(pr->duplicate.count, "2");
+          
+          pr->ood.enabled = FALSE;
+          pr->ood.inbound = TRUE;
+          pr->ood.outbound = TRUE;
+          strcpy(pr->ood.chance, "10.0");
+          
+          pr->tamper.enabled = FALSE;
+          pr->tamper.inbound = TRUE;
+          pr->tamper.outbound = TRUE;
+          strcpy(pr->tamper.chance, "10.0");
+          pr->tamper.checksum = TRUE;
+          
+          pr->reset.enabled = FALSE;
+          pr->reset.inbound = TRUE;
+          pr->reset.outbound = TRUE;
+          strcpy(pr->reset.chance, "0");
+          
+          pr->bandwidth.enabled = FALSE;
+          pr->bandwidth.inbound = TRUE;
+          pr->bandwidth.outbound = TRUE;
+          strcpy(pr->bandwidth.limit, "10");
+          
+          strncpy(pr->name, name, sizeof(pr->name) - 1);
+          strncpy(pr->filter, filter, sizeof(pr->filter) - 1);
+          
+          filtersSize++;
+          LOG("Migrated profile: %s -> %s", name, filter);
+        }
+      }
+    }
+  }
+  
+  fclose(txtFile);
+  
+  // Save the new config.yaml
+  saveConfig();
+  
+  // Rename config.txt to config.txt.bak to prevent migrating again
+  if (rename(txtPath, bakPath) == 0) {
+    LOG("Successfully renamed %s to %s", txtPath, bakPath);
+  } else {
+    LOG("Warning: Failed to rename legacy config file");
+  }
+  
+  return TRUE;
+}
+
 // loading up filters and fill in
 void loadConfig() {
   char path[MSG_BUFSIZE];
@@ -198,17 +357,22 @@ void loadConfig() {
   // Open file once to check existence, size, and readiness
   f = fopen(path, "r");
   if (!f) {
-    LOG("config.yaml not found, generating default...");
-    FILE *writeF = fopen(path, "w");
-    if (writeF) {
-      fprintf(writeF, "%s", default_yaml_template);
-      fclose(writeF);
-      LOG("Successfully generated config.yaml at %s", path);
+    // Try to migrate from config.txt first
+    if (tryMigrateConfigTxt(path)) {
+      f = fopen(path, "r");
     } else {
-      LOG("Error: Failed to write config.yaml to %s", path);
-      return;
+      LOG("config.yaml not found, generating default...");
+      FILE *writeF = fopen(path, "w");
+      if (writeF) {
+        fprintf(writeF, "%s", default_yaml_template);
+        fclose(writeF);
+        LOG("Successfully generated config.yaml at %s", path);
+      } else {
+        LOG("Error: Failed to write config.yaml to %s", path);
+        return;
+      }
+      f = fopen(path, "r");
     }
-    f = fopen(path, "r");
   } else {
     fseek(f, 0, SEEK_END);
     size = ftell(f);
