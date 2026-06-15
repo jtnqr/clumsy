@@ -2,60 +2,60 @@
 
 **clumsy makes your network condition on Windows significantly worse, but in a managed and interactive manner.**
 
-Leveraging the awesome [WinDivert](http://reqrypt.org/windivert.html), clumsy stops living network packets and capture them, lag/drop/tamper/.. the packets on demand, then send them away. Whether you want to track down weird bugs related to broken network, or evaluate your application on poor connections, clumsy will come in handy:
+Leveraging the awesome [WinDivert](http://reqrypt.org/windivert.html), clumsy intercepts live network packets, performs lag/drop/tamper/throttle operations on demand, and forwards them. Whether you want to debug connection edge-cases or test application resilience, clumsy is designed to be simple and lightweight:
 
-- No installation.
-- No need for proxy setup or code change in your application.
-- System wide network capturing means it works on any application.
-- Works even if you're offline (ie, connecting from localhost to localhost).
-- Your application keeps running, while clumsy can start and stop anytime.
-- Interactive control how bad the network can be, with enough visual feedback to tell you what's going on.
+- **No installation required**: run the executable directly without system installation.
+- **No proxy configuration**: works without proxy setup or application code modifications.
+- **System-wide capture**: intercepts network packets system-wide across all active applications.
+- **Offline loopback support**: works even when offline (e.g., localhost/loopback connections).
+- **Non-disruptive toggling**: keep target applications running while starting or stopping degradation.
+- **Interactive controls**: configure network degradation dynamically with real-time feedback.
 
-See [this page](http://jagt.github.io/clumsy) for more info and original build instructions.
+See the [clumsy homepage](http://jagt.github.io/clumsy) for more information and the original build instructions.
 
-## Fork Enhancements
+## Fork enhancements
 
-This fork adds several advanced UI/UX and feature improvements:
+This fork introduces key features, UI/UX refinements, and stability improvements:
 
-### Dynamic Kernel-Level Process Filtering
-- Target specific applications by name (e.g., `discord.exe`, `chrome.exe`, `roblox`) instead of guessing static port ranges.
-- Intercepts connection mappings dynamically to match network sockets to running processes.
-- Automatically handles mid-session connections and cleanly releases resources on stop/close.
+### Dynamic kernel-level process filtering
+- **Process targeting**: filter network traffic for specific applications by name (e.g., `discord.exe`, `chrome.exe`, `roblox`) instead of guessing static port ranges.
+- **Dynamic socket mapping**: tracks connection mappings dynamically to match network sockets to active processes.
+- **Safe cleanups**: automatically handles mid-session connections and releases system resources on stop or exit.
 
-### Session Timer (Duration Limit)
-- Restrict filtering sessions by configuring an execution duration in milliseconds.
-- Automatically stops network degradation when the timer expires.
+### Session timer (duration limit)
+- **Execution limits**: restrict packet filtering sessions to a configured duration in milliseconds.
+- **Auto-stop safety**: automatically stops network degradation when the duration timer expires.
 
-### Global Hotkey Toggle
-- Configure a hotkey in `config.yaml` (e.g., `hotkey: f6` or `hotkey: ctrl+shift+c`).
-- Hotkey displayed next to the Start button.
-- Press the hotkey anytime to toggle filtering on/off.
+### Global hotkey toggle
+- **Custom shortcut**: configure a global hotkey in `config.yaml` (e.g., `hotkey: f6` or `hotkey: ctrl+shift+c`).
+- **Visual shortcut guide**: displays the active hotkey next to the Start button in the UI.
+- **One-click toggle**: toggle packet interceptors on or off globally at any time using the hotkey.
 
-### State Persistence, Presets & Configs
-- Config file upgraded to structured `config.yaml`.
-- Automatically generates a default, valid `config.yaml` if missing to prevent boot failures.
-- **Preset management**: Save custom configurations or delete existing ones directly from the UI.
-- **Dynamic `<custom>` selection**: Automatically switches the dropdown selection to `<custom>` when settings are tweaked.
-- **Legacy migration**: Automatically parses and upgrades old `config.txt` configurations to `config.yaml` on startup.
-- Filter text, target process, duration timer, and module settings are saved to `state.txt` on exit.
-- Restores active settings on launch (without auto-starting).
+### State persistence, presets, and configuration
+- **YAML format**: configuration file upgraded to a structured, documented `config.yaml`.
+- **Default fallback**: automatically generates a default, valid `config.yaml` if missing on boot.
+- **Preset editor**: save custom configurations or delete existing ones directly from the UI.
+- **Dynamic `<custom>` selection**: automatically switches the dropdown selection to `<custom>` when settings are tweaked.
+- **Legacy migration**: automatically parses and upgrades old `config.txt` configurations to `config.yaml` on startup.
+- **State saving**: filter text, target process, duration timer, and module settings are saved to `state.txt` on exit.
+- **Restore state**: restores active settings on launch without auto-starting.
 
-### Visual Layout & Sizing Safeguards
-- Restructured layout with dedicated side-by-side frames for "Process Filter" and "Session Timer".
-- Programmatically enforces a minimum window size using computed natural dimensions (`RASTERSIZE`), preventing label clipping and text wrapping issues on any screen DPI.
-- Fully detached console subsystem for clean windowed execution.
+### Visual layout and sizing safeguards
+- **Side-by-side frames**: restructured UI layout to place Process Filter and Session Timer settings side-by-side.
+- **DPI and layout safety**: dynamically calculates minimum window size based on natural element dimensions (`RASTERSIZE`) to prevent clipping and text wrapping across different screen DPIs.
+- **Detached console**: fully detached console subsystem to run clumsy cleanly as a windowed application.
 
-### Improved UI Feedback & Statistics
-- Window title shows `(running)` when filtering is active.
-- Real-time packet counters show exactly how many packets were affected per module.
-- Tooltips on all modules and controls, including a WinDivert filter syntax guide.
+### Improved UI feedback and statistics
+- **Active state title indicator**: window title displays `(running)` when packet filtering is active.
+- **Per-module packet statistics**: real-time counters display the number of packets affected by each module.
+- **Context tooltips**: comprehensive tooltips on all modules and controls, including a guide for WinDivert filter syntax.
 
 ## Details
 
-Simulate network latency, delay, packet loss with clumsy on Windows 7/8/10:
+Simulate network latency, delay, packet loss with clumsy on Windows:
 
 ![](clumsy-demo.gif)
 
 ## License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).
